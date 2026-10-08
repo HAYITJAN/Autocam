@@ -144,7 +144,7 @@ export default function ViolationsPage() {
               label="Ko‘rib chiqilmoqda"
               value={formatNumber(s?.pending)}
               hint={s ? formatPct((s.pending / total) * 100) : undefined}
-              spark={kpis.data && <Sparkline values={kpis.data.pending_today.sparkline} color="#1f6feb" />}
+              spark={kpis.data && <Sparkline values={kpis.data.pending_today.sparkline} color="#625fee" />}
             />
             <KpiTile icon={XCircle} tone="slate" label="Rad etilgan" value={formatNumber(s?.rejected)} hint={s ? formatPct((s.rejected / total) * 100) : undefined} />
           </>
@@ -225,7 +225,7 @@ export default function ViolationsPage() {
                         <th className="th">
                           <button
                             type="button"
-                            className="uppercase"
+                            className="whitespace-nowrap hover:text-slate-600"
                             onClick={() => update("sort", get("sort") === "occurred_at" ? "-occurred_at" : "occurred_at")}
                           >
                             Sana va vaqt {get("sort") === "occurred_at" ? "↑" : "↓"}
@@ -271,7 +271,7 @@ export default function ViolationsPage() {
                               {item.type.name_uz}
                             </span>
                           </td>
-                          <td className="td font-mono text-xs">{item.camera.code}</td>
+                          <td className="td whitespace-nowrap font-mono text-xs">{item.camera.code}</td>
                           <td className="td text-sm">{item.location_name ?? "—"}</td>
                           <td className={cn("td text-right font-semibold", confidenceTone(item.ai_confidence))}>
                             {formatConfidence(item.ai_confidence)}

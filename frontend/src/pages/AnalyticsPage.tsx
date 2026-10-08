@@ -172,9 +172,9 @@ export default function AnalyticsPage() {
                       data={data.days.map((day) => ({ label: formatDay(day.day), confirmed: day.confirmed, rejected: day.rejected }))}
                       margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
                       <Tooltip />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Bar dataKey="confirmed" name={t("violation.status.CONFIRMED")} stackId="a" fill="#16a34a" />

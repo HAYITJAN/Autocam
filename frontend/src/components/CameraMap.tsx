@@ -72,7 +72,7 @@ export function CameraMap({ cameras = [], heat = [], districts = [], height = 32
             center={[camera.latitude, camera.longitude]}
             radius={camera.id === selectedId ? 11 : 7}
             pathOptions={{
-              color: camera.id === selectedId ? "#1f6feb" : "#fff",
+              color: camera.id === selectedId ? "#625fee" : "#fff",
               weight: camera.id === selectedId ? 3 : 2,
               fillColor: STATUS_COLORS[camera.status],
               fillOpacity: 1,

@@ -1,15 +1,30 @@
+@import "@fontsource-variable/inter";
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --color-brand-50: #eff5ff;
-  --color-brand-100: #dbe7fe;
-  --color-brand-200: #bfd4fe;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #1f6feb;
-  --color-brand-700: #1a5fd0;
-  --color-brand-800: #1e40af;
-  --color-page: #f3f6fb;
+  --font-sans: "Inter Variable", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --color-brand-50: #f1f1fe;
+  --color-brand-100: #e5e5fd;
+  --color-brand-200: #cfcefb;
+  --color-brand-300: #aeacf8;
+  --color-brand-400: #8a87f4;
+  --color-brand-500: #716ef1;
+  --color-brand-600: #625fee;
+  --color-brand-700: #514dd6;
+  --color-brand-800: #423fae;
+
+  --color-navy-950: #0a1130;
+  --color-navy-900: #10183c;
+  --color-navy-800: #1a2350;
+  --color-navy-700: #273163;
+  --color-navy-600: #3a4478;
+
+  --color-line: #eceef3;
+  --color-page: #f2f3f7;
+
+  --shadow-soft: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.03);
+  --shadow-lift: 0 4px 12px rgba(16, 24, 40, 0.06), 0 2px 4px rgba(16, 24, 40, 0.04);
 }
 
 @layer base {
@@ -18,41 +33,72 @@
   #root {
     height: 100%;
   }
+
+  body {
+    @apply bg-page text-slate-800 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
 }
 
 @utility card {
-  @apply rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_rgba(15,23,42,0.04)];
+  @apply rounded-2xl border border-line bg-white shadow-soft;
 }
 
 @utility input {
-  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-100;
+  @apply h-9 w-full rounded-[10px] border border-line bg-white px-3 text-[13px] text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-400 focus:ring-3 focus:ring-brand-100 disabled:bg-slate-50;
 }
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex h-9 items-center justify-center gap-2 rounded-[10px] px-3.5 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 @utility btn-primary {
-  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  @apply btn bg-brand-600 text-white shadow-sm shadow-brand-600/30 hover:bg-brand-700;
 }
 
 @utility btn-secondary {
-  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+  @apply btn border border-line bg-white text-slate-700 shadow-soft hover:bg-slate-50;
 }
 
 @utility btn-danger {
-  @apply btn bg-red-600 text-white hover:bg-red-700;
+  @apply btn bg-rose-500 text-white shadow-sm shadow-rose-500/30 hover:bg-rose-600;
 }
 
 @utility th {
-  @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+  @apply border-b border-line bg-white px-4 py-3 text-left text-xs font-medium text-slate-400;
 }
 
 @utility td {
-  @apply px-4 py-3 text-sm text-slate-700;
+  @apply px-4 py-3 text-[13px] text-slate-700;
+}
+
+@utility segmented {
+  @apply inline-flex flex-wrap items-center gap-0.5 rounded-[10px] bg-slate-100 p-[3px];
+}
+
+@utility segmented-item {
+  @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-800;
+}
+
+@utility segmented-active {
+  @apply bg-white text-slate-900 shadow-soft;
 }
 
 .leaflet-container {
   font-family: inherit;
   z-index: 0;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: #d5d8e1;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }

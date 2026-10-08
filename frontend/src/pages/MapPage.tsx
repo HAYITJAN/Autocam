@@ -12,7 +12,7 @@ import type { CameraStatus } from "@/lib/types";
 
 type Layer = "cameras" | "heatmap" | "districts";
 
-const DISTRICT_BAR_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#3b82f6", "#3b82f6", "#60a5fa", "#93c5fd", "#93c5fd"];
+const DISTRICT_BAR_COLORS = ["#f43f5e", "#f97316", "#f59e0b", "#625fee", "#716ef1", "#8a87f4", "#aeacf8", "#cfcefb"];
 
 function SelectedCamera({ id, onClose }: { id: number; onClose: () => void }) {
   const camera = useCamera(id);

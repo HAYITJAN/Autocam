@@ -1,15 +1,18 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   Bell,
   Camera,
   Car,
-  ChevronDown,
+  ChevronLeft,
   FileText,
+  Globe,
   LayoutDashboard,
   LogOut,
   Map,
   Menu,
   MonitorPlay,
+  RefreshCw,
   Search,
   Settings,
   ShieldAlert,
@@ -17,7 +20,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useSystemStatus, useUnreadCount } from "@/api/queries";
@@ -33,19 +36,56 @@ interface NavItem {
   permission?: string;
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "nav.dashboard", icon: LayoutDashboard, permission: "dashboard.view" },
-  { to: "/monitoring", label: "nav.monitoring", icon: MonitorPlay, permission: "monitoring.view" },
-  { to: "/cameras", label: "nav.cameras", icon: Camera, permission: "cameras.view" },
-  { to: "/violations", label: "nav.violations", icon: ShieldAlert, permission: "violations.view" },
-  { to: "/vehicles", label: "nav.vehicles", icon: Car, permission: "vehicles.view" },
-  { to: "/map", label: "nav.map", icon: Map, permission: "monitoring.view" },
-  { to: "/analytics", label: "nav.analytics", icon: BarChart3, permission: "analytics.view" },
-  { to: "/reports", label: "nav.reports", icon: FileText, permission: "reports.view" },
-  { to: "/notifications", label: "nav.notifications", icon: Bell },
-  { to: "/users", label: "nav.users", icon: Users, permission: "users.view" },
-  { to: "/settings", label: "nav.settings", icon: Settings, permission: "settings.view" },
+interface NavGroup {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    key: "overview",
+    label: "Boshqaruv",
+    icon: LayoutDashboard,
+    items: [
+      { to: "/", label: "nav.dashboard", icon: LayoutDashboard, permission: "dashboard.view" },
+      { to: "/monitoring", label: "nav.monitoring", icon: MonitorPlay, permission: "monitoring.view" },
+      { to: "/map", label: "nav.map", icon: Map, permission: "monitoring.view" },
+    ],
+  },
+  {
+    key: "control",
+    label: "Nazorat",
+    icon: ShieldAlert,
+    items: [
+      { to: "/cameras", label: "nav.cameras", icon: Camera, permission: "cameras.view" },
+      { to: "/violations", label: "nav.violations", icon: ShieldAlert, permission: "violations.view" },
+      { to: "/vehicles", label: "nav.vehicles", icon: Car, permission: "vehicles.view" },
+    ],
+  },
+  {
+    key: "analytics",
+    label: "Tahlil",
+    icon: BarChart3,
+    items: [
+      { to: "/analytics", label: "nav.analytics", icon: BarChart3, permission: "analytics.view" },
+      { to: "/reports", label: "nav.reports", icon: FileText, permission: "reports.view" },
+    ],
+  },
+  {
+    key: "system",
+    label: "Tizim",
+    icon: Settings,
+    items: [
+      { to: "/notifications", label: "nav.notifications", icon: Bell },
+      { to: "/users", label: "nav.users", icon: Users, permission: "users.view" },
+      { to: "/settings", label: "nav.settings", icon: Settings, permission: "settings.view" },
+    ],
+  },
 ];
+
+const COLLAPSE_KEY = "st.sidebar.collapsed";
 
 const MONTHS = ["Yan", "Fev", "Mar", "Apr", "May", "Iyun", "Iyul", "Avg", "Sen", "Okt", "Noy", "Dek"];
 const WEEKDAYS: Record<string, string> = {
@@ -57,6 +97,18 @@ const WEEKDAYS: Record<string, string> = {
   Sat: "Shanba",
   Sun: "Yakshanba",
 };
+
+function isItemActive(item: NavItem, pathname: string): boolean {
+  return item.to === "/" ? pathname === "/" : pathname === item.to || pathname.startsWith(`${item.to}/`);
+}
+
+function useNavGroups() {
+  const permissions = useAuthStore((state) => state.user?.permissions) ?? [];
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.permission || permissions.includes(item.permission)),
+  })).filter((group) => group.items.length > 0);
+}
 
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => new Date());
@@ -86,12 +138,12 @@ function Clock() {
   );
   const month = MONTHS[Number(parts.month) - 1] ?? "";
   return (
-    <div className="hidden text-right leading-tight md:block">
-      <div className="text-xs text-slate-500">
-        {parts.day} {month} {parts.year}, {WEEKDAYS[parts.weekday ?? ""] ?? ""}
-      </div>
-      <div className="font-mono text-lg font-bold tracking-tight text-slate-900">
+    <div className="hidden text-right leading-tight 2xl:block">
+      <div className="font-mono text-sm font-semibold tabular-nums text-white">
         {parts.hour}:{parts.minute}:{parts.second}
+      </div>
+      <div className="text-[11px] text-white/50">
+        {parts.day} {month} {parts.year}, {WEEKDAYS[parts.weekday ?? ""] ?? ""}
       </div>
     </div>
   );
@@ -106,141 +158,20 @@ function initials(name: string | undefined): string {
     .join("");
 }
 
-function Avatar({ name, size = "md" }: { name: string | undefined; size?: "sm" | "md" }) {
+function HeaderIconButton({ label, onClick, to, children }: { label: string; onClick?: () => void; to?: string; children: ReactNode }) {
+  const className =
+    "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-700/80 text-white/80 transition hover:bg-navy-600 hover:text-white";
+  if (to) {
+    return (
+      <Link to={to} className={className} aria-label={label} title={label}>
+        {children}
+      </Link>
+    );
+  }
   return (
-    <div
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-800 font-semibold text-white",
-        size === "md" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs",
-      )}
-    >
-      {initials(name)}
-    </div>
-  );
-}
-
-function StatusRow({ label, ok, value }: { label: string; ok: boolean | null; value?: string }) {
-  return (
-    <li className="flex items-center justify-between text-[13px]">
-      <span className="flex items-center gap-2 text-slate-600">
-        <span className={cn("h-2 w-2 rounded-full", ok === null ? "bg-slate-300" : ok ? "bg-emerald-500" : "bg-red-500")} />
-        {label}
-      </span>
-      <span className={cn("font-medium", ok === null ? "text-slate-400" : ok ? "text-emerald-600" : "text-red-600")}>
-        {value ?? (ok === null ? "—" : ok ? "Online" : "Offline")}
-      </span>
-    </li>
-  );
-}
-
-function SystemStatusBox() {
-  const status = useSystemStatus();
-  const component = (name: string) => {
-    const found = status.data?.components.find((item) => item.name === name);
-    return found ? found.state === "up" : null;
-  };
-  const allUp = status.data ? status.data.components.every((item) => item.state === "up" || !item.critical) : null;
-  return (
-    <div className="rounded-xl border border-slate-200/70 bg-white p-3.5">
-      <div className="mb-2.5 flex items-center justify-between">
-        <span className="text-sm font-bold text-slate-800">Tizim holati</span>
-        <span className={cn("flex items-center gap-1.5 text-xs font-medium", allUp ? "text-emerald-600" : "text-amber-600")}>
-          <span className={cn("h-2 w-2 rounded-full", allUp ? "bg-emerald-500" : "bg-amber-500")} />
-          {allUp ? "Online" : "Qisman"}
-        </span>
-      </div>
-      <ul className="space-y-1.5">
-        <StatusRow label="Server" ok={status.isError ? false : status.data ? true : null} />
-        <StatusRow label="AI modul" ok={component("ai_service")} />
-        <StatusRow label="Ma’lumotlar bazasi" ok={component("database")} />
-        <StatusRow
-          label="Kameralar"
-          ok={status.data ? status.data.cameras_online > 0 : null}
-          value={status.data ? `${status.data.cameras_online} / ${status.data.cameras_total}` : undefined}
-        />
-      </ul>
-    </div>
-  );
-}
-
-function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const user = useAuthStore((state) => state.user);
-  const permissions = user?.permissions ?? [];
-  const canSeeStatus = useHasPermission("dashboard.view");
-  const unread = useUnreadCount();
-  const navigate = useNavigate();
-  const items = NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
-  const unreadTotal = unread.data?.total ?? 0;
-
-  return (
-    <>
-      <div className={cn("fixed inset-0 z-30 bg-slate-900/40 lg:hidden", open ? "block" : "hidden")} onClick={onClose} aria-hidden />
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-slate-200/70 bg-white transition-transform lg:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="flex h-[72px] items-center justify-between gap-2 px-5">
-          <Link to="/" className="flex items-center gap-3" onClick={onClose}>
-            <img src="/favicon.svg" alt="" className="h-10 w-10 rounded-xl shadow-sm" />
-            <div className="leading-tight">
-              <div className="text-[15px] font-extrabold tracking-wide text-slate-900">{t("app.name")}</div>
-              <div className="text-xs text-slate-500">Yo‘l harakati nazorati</div>
-            </div>
-          </Link>
-          <button type="button" className="lg:hidden" onClick={onClose} aria-label="close">
-            <X className="h-5 w-5 text-slate-500" />
-          </button>
-        </div>
-
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              onClick={onClose}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium transition",
-                  isActive ? "bg-brand-600 text-white shadow-md shadow-brand-600/25" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                )
-              }
-            >
-              <item.icon className="h-[19px] w-[19px]" />
-              <span className="flex-1">{t(item.label)}</span>
-              {item.to === "/notifications" && unreadTotal > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                  {Math.min(unreadTotal, 99)}
-                </span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-3">
-          {canSeeStatus && <SystemStatusBox />}
-          <div className="rounded-xl border border-slate-200/70 bg-white p-2.5">
-            <div className="flex items-center gap-3">
-              <Avatar name={user?.full_name} />
-              <div className="min-w-0 flex-1 leading-tight">
-                <div className="truncate text-sm font-semibold text-slate-800">{user?.full_name}</div>
-                <div className="truncate text-xs text-slate-500">{user?.role_name}</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void logout().finally(() => navigate("/login", { replace: true }))}
-              className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600"
-            >
-              <LogOut className="h-4 w-4" />
-              {t("auth.logout")}
-            </button>
-          </div>
-        </div>
-      </aside>
-    </>
+    <button type="button" className={className} onClick={onClick} aria-label={label} title={label}>
+      {children}
+    </button>
   );
 }
 
@@ -270,71 +201,277 @@ function GlobalSearch() {
   };
 
   return (
-    <form onSubmit={submit} className="relative hidden max-w-xl flex-1 sm:block">
-      <Search className="pointer-events-none absolute left-3.5 top-2.5 h-[18px] w-[18px] text-slate-400" />
+    <form onSubmit={submit} className="relative hidden w-[260px] md:block">
+      <Search className="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-white/40" />
       <input
         ref={input}
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="Qidirish… (kamera, davlat raqami, qoidabuzarlik ID)"
-        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-16 text-sm outline-none transition focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-100"
+        placeholder="Qidirish…"
+        title="Kamera kodi, davlat raqami yoki qoidabuzarlik ID"
+        className="h-9 w-full rounded-full border border-white/10 bg-white/[0.06] pl-10 pr-14 text-[13px] text-white outline-none transition placeholder:text-white/40 focus:border-brand-400 focus:bg-white/10"
       />
-      <kbd className="pointer-events-none absolute right-3 top-2 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] text-slate-500">
+      <kbd className="pointer-events-none absolute right-3 top-2 rounded-md border border-white/10 px-1.5 py-0.5 text-[10px] text-white/40">
         Ctrl K
       </kbd>
     </form>
   );
 }
 
-function Topbar({ onMenu }: { onMenu: () => void }) {
+function TopHeader({ onMenu }: { onMenu: () => void }) {
   const user = useAuthStore((state) => state.user);
   const unread = useUnreadCount();
   const unreadTotal = unread.data?.total ?? 0;
+  const queryClient = useQueryClient();
+  const groups = useNavGroups();
+  const { pathname } = useLocation();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-slate-200/70 bg-white/85 px-4 backdrop-blur lg:px-6">
-      <button type="button" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={onMenu} aria-label="menu">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 bg-navy-900 px-4 shadow-[0_1px_0_rgba(255,255,255,0.04)] lg:px-5">
+      <button type="button" className="rounded-lg p-1.5 text-white/80 hover:bg-white/10 lg:hidden" onClick={onMenu} aria-label="menu">
         <Menu className="h-5 w-5" />
       </button>
-      <GlobalSearch />
-      <div className="flex-1" />
-      <Clock />
-      <Link to="/notifications" className="relative rounded-xl p-2.5 text-slate-600 hover:bg-slate-100" aria-label={t("nav.notifications")}>
-        <Bell className="h-5 w-5" />
-        {unreadTotal > 0 && (
-          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {Math.min(unreadTotal, 99)}
-          </span>
-        )}
+      <Link to="/" className="flex shrink-0 items-center gap-2.5 pr-2">
+        <img src="/favicon.svg" alt="" className="h-9 w-9 rounded-xl" />
+        <div className="hidden leading-tight sm:block">
+          <div className="text-[15px] font-extrabold tracking-wide text-white">{t("app.name")}</div>
+          <div className="text-[11px] text-white/50">Yo‘l harakati nazorati</div>
+        </div>
       </Link>
-      <span className="hidden items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-medium text-slate-700 sm:flex">
-        <span className="h-4 w-4 overflow-hidden rounded-full bg-[linear-gradient(#1eb5e8_0_33%,#fff_33%_66%,#1eb53a_66%)] ring-1 ring-slate-200" />
-        Uz
-        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-      </span>
-      <div className="hidden items-center gap-2.5 border-l border-slate-200 pl-4 sm:flex">
-        <Avatar name={user?.full_name} size="sm" />
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-slate-800">{user?.full_name}</div>
-          <div className="text-xs text-slate-500">{user?.role_name}</div>
+
+      <nav className="ml-2 hidden items-center gap-1 lg:flex">
+        {groups.map((group) => {
+          const active = group.items.some((item) => isItemActive(item, pathname));
+          const first = group.items[0];
+          if (!first) return null;
+          return (
+            <Link
+              key={group.key}
+              to={first.to}
+              className={cn(
+                "flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition",
+                active ? "bg-navy-700 text-white shadow-inner" : "text-white/65 hover:bg-white/5 hover:text-white",
+              )}
+            >
+              <group.icon className="h-4 w-4" />
+              {group.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="flex-1" />
+      <GlobalSearch />
+      <Clock />
+      <div className="flex items-center gap-2">
+        <HeaderIconButton label="Yangilash" onClick={() => void queryClient.invalidateQueries()}>
+          <RefreshCw className="h-4 w-4" />
+        </HeaderIconButton>
+        <HeaderIconButton label={t("nav.notifications")} to="/notifications">
+          <Bell className="h-4 w-4" />
+          {unreadTotal > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-navy-900">
+              {Math.min(unreadTotal, 99)}
+            </span>
+          )}
+        </HeaderIconButton>
+        <span className="hidden sm:block">
+          <HeaderIconButton label="O‘zbekcha">
+            <Globe className="h-4 w-4" />
+          </HeaderIconButton>
+        </span>
+      </div>
+      <div className="ml-1 hidden items-center gap-2.5 sm:flex">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-bold text-navy-900">
+          {initials(user?.full_name)}
+        </div>
+        <div className="hidden leading-tight xl:block">
+          <div className="max-w-[160px] truncate text-[13px] font-semibold text-white">{user?.full_name}</div>
+          <div className="text-[11px] text-white/50">{user?.role_name}</div>
         </div>
       </div>
     </header>
   );
 }
 
+function StatusRow({ label, ok, value }: { label: string; ok: boolean | null; value?: string }) {
+  return (
+    <li className="flex items-center justify-between text-xs">
+      <span className="flex items-center gap-2 text-slate-500">
+        <span className={cn("h-1.5 w-1.5 rounded-full", ok === null ? "bg-slate-300" : ok ? "bg-emerald-500" : "bg-rose-500")} />
+        {label}
+      </span>
+      <span className={cn("font-medium", ok === null ? "text-slate-400" : ok ? "text-emerald-600" : "text-rose-600")}>
+        {value ?? (ok === null ? "—" : ok ? "Online" : "Offline")}
+      </span>
+    </li>
+  );
+}
+
+function SystemStatusBox() {
+  const status = useSystemStatus();
+  const component = (name: string) => {
+    const found = status.data?.components.find((item) => item.name === name);
+    return found ? found.state === "up" : null;
+  };
+  const allUp = status.data ? status.data.components.every((item) => item.state === "up" || !item.critical) : null;
+  return (
+    <div className="rounded-xl bg-slate-50 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-semibold text-slate-700">Tizim holati</span>
+        <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", allUp ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
+          {allUp ? "Online" : "Qisman"}
+        </span>
+      </div>
+      <ul className="space-y-1.5">
+        <StatusRow label="Server" ok={status.isError ? false : status.data ? true : null} />
+        <StatusRow label="AI modul" ok={component("ai_service")} />
+        <StatusRow label="Ma’lumotlar bazasi" ok={component("database")} />
+        <StatusRow
+          label="Kameralar"
+          ok={status.data ? status.data.cameras_online > 0 : null}
+          value={status.data ? `${status.data.cameras_online} / ${status.data.cameras_total}` : undefined}
+        />
+      </ul>
+    </div>
+  );
+}
+
+function SideNavLink({ item, collapsed, unread, onNavigate }: { item: NavItem; collapsed: boolean; unread: number; onNavigate: () => void }) {
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      onClick={onNavigate}
+      title={collapsed ? t(item.label) : undefined}
+      className={({ isActive }) =>
+        cn(
+          "group relative flex h-10 items-center gap-3 rounded-[10px] border text-[13px] transition",
+          collapsed ? "justify-center px-0" : "px-3",
+          isActive
+            ? "border-line bg-[#f5f5fb] font-semibold text-navy-900 shadow-soft"
+            : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+        )
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <item.icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-brand-600" : "text-slate-400 group-hover:text-slate-600")} />
+          {!collapsed && <span className="flex-1 truncate">{t(item.label)}</span>}
+          {item.to === "/notifications" && unread > 0 && (
+            <span
+              className={cn(
+                "flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white",
+                collapsed && "absolute right-1 top-1",
+              )}
+            >
+              {Math.min(unread, 99)}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+function Sidebar({
+  open,
+  collapsed,
+  onClose,
+  onToggle,
+}: {
+  open: boolean;
+  collapsed: boolean;
+  onClose: () => void;
+  onToggle: () => void;
+}) {
+  const groups = useNavGroups();
+  const { pathname } = useLocation();
+  const canSeeStatus = useHasPermission("dashboard.view");
+  const unread = useUnreadCount().data?.total ?? 0;
+  const navigate = useNavigate();
+  const activeGroup = groups.find((group) => group.items.some((item) => isItemActive(item, pathname))) ?? groups[0];
+  // The drawer on small screens lists every section because the header navigation is hidden there.
+  const visibleGroups = open ? groups : activeGroup ? [activeGroup] : [];
+  const narrow = collapsed && !open;
+
+  return (
+    <>
+      <div className={cn("fixed inset-0 z-30 bg-navy-950/50 lg:hidden", open ? "block" : "hidden")} onClick={onClose} aria-hidden />
+      <aside
+        className={cn(
+          "fixed bottom-0 left-0 top-0 z-40 flex flex-col border-r border-line bg-white transition-[width,transform] duration-200 lg:sticky lg:top-16 lg:z-10 lg:h-[calc(100vh-4rem)] lg:translate-x-0",
+          narrow ? "w-[72px]" : "w-[240px]",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex h-12 items-center justify-between px-4 pt-2">
+          {!narrow && <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{open ? "Bo‘limlar" : activeGroup?.label}</span>}
+          <button
+            type="button"
+            onClick={open ? onClose : onToggle}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-lg border border-line bg-white text-slate-500 shadow-soft hover:text-slate-800",
+              narrow && "mx-auto",
+            )}
+            aria-label={open ? "close" : "toggle sidebar"}
+          >
+            {open ? <X className="h-4 w-4" /> : <ChevronLeft className={cn("h-4 w-4 transition", collapsed && "rotate-180")} />}
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
+          {visibleGroups.map((group) => (
+            <div key={group.key} className="space-y-1">
+              {open && <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</div>}
+              {group.items.map((item) => (
+                <SideNavLink key={item.to} item={item} collapsed={narrow} unread={unread} onNavigate={onClose} />
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        <div className="space-y-2 p-3">
+          {canSeeStatus && !narrow && <SystemStatusBox />}
+          <button
+            type="button"
+            onClick={() => void logout().finally(() => navigate("/login", { replace: true }))}
+            title={narrow ? t("auth.logout") : undefined}
+            className={cn(
+              "flex h-10 w-full items-center gap-3 rounded-[10px] text-[13px] text-slate-500 transition hover:bg-rose-50 hover:text-rose-600",
+              narrow ? "justify-center" : "px-3",
+            )}
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+            {!narrow && t("auth.logout")}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 export function Layout() {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === "1");
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
 
+  const toggle = () =>
+    setCollapsed((value) => {
+      localStorage.setItem(COLLAPSE_KEY, value ? "0" : "1");
+      return !value;
+    });
+
   return (
     <div className="min-h-full">
-      <Sidebar open={open} onClose={() => setOpen(false)} />
-      <div className="lg:pl-[260px]">
-        <Topbar onMenu={() => setOpen(true)} />
-        <main className="mx-auto max-w-[1680px] p-4 lg:p-6">
-          <Outlet />
+      <TopHeader onMenu={() => setOpen(true)} />
+      <div className="flex">
+        <Sidebar open={open} collapsed={collapsed} onClose={() => setOpen(false)} onToggle={toggle} />
+        <main className="min-w-0 flex-1 p-4 lg:p-6">
+          <div className="mx-auto max-w-[1680px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

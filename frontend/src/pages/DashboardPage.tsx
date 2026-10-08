@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, Car, CheckCircle2, Clock3, Gauge, ShieldAlert, TriangleAlert, type LucideIcon } from "lucide-react";
+import { ArrowRight, Camera, Car, CheckCircle2, Clock3, Gauge, Info, ShieldAlert, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -13,7 +13,16 @@ import {
 import { CameraMap, MapLegend } from "@/components/CameraMap";
 import { CameraPreview } from "@/components/CameraPreview";
 import { DonutChart, Sparkline, TimeseriesChart } from "@/components/charts";
-import { Card, CardHeader, CameraStatusBadge, QueryView, RangeTabs, ViolationStatusBadge } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  CameraStatusBadge,
+  IconBadge,
+  QueryView,
+  RangeTabs,
+  ViolationStatusBadge,
+  type IconTone,
+} from "@/components/ui";
 import { cn, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { CameraListItem, Kpi, TimeRange } from "@/lib/types";
@@ -24,28 +33,32 @@ function Skyline() {
     [152, 62], [168, 48], [182, 80], [198, 56], [214, 34], [228, 70], [244, 44], [258, 60], [274, 36], [290, 52],
   ] as const;
   return (
-    <svg viewBox="0 0 310 110" className="absolute bottom-0 right-0 h-full w-[55%] opacity-90" preserveAspectRatio="xMaxYMax meet" aria-hidden>
+    <svg viewBox="0 0 310 110" className="absolute bottom-0 right-6 h-full w-[50%] opacity-60" preserveAspectRatio="xMaxYMax meet" aria-hidden>
       <defs>
         <linearGradient id="tower" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#93b4e6" />
-          <stop offset="1" stopColor="#c9dbf5" />
+          <stop offset="0" stopColor="#8a87f4" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#8a87f4" stopOpacity="0.05" />
         </linearGradient>
       </defs>
       {towers.map(([x, h]) => (
-        <rect key={x} x={x} y={110 - h} width={14} height={h} rx={1.5} fill="url(#tower)" />
+        <rect key={x} x={x} y={110 - h} width={14} height={h} rx={2} fill="url(#tower)" />
       ))}
-      <rect x="143" y="2" width="2" height="6" fill="#93b4e6" />
+      <rect x="143" y="2" width="2" height="6" fill="#8a87f4" opacity="0.6" />
     </svg>
   );
 }
 
 function Hero() {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-white via-[#eef4fd] to-[#dce9fb] px-6 py-6">
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-[#2d2a7a] px-7 py-7 shadow-lift">
+      <div className="pointer-events-none absolute -left-16 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
       <Skyline />
       <div className="relative max-w-xl">
-        <h1 className="text-[30px] font-extrabold leading-tight tracking-tight text-slate-900">Yo‘l harakati nazorati tizimi</h1>
-        <p className="mt-1.5 text-sm text-slate-600">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Toshkent shahri · real vaqt
+        </span>
+        <h1 className="mt-3 text-[26px] font-bold leading-tight tracking-tight text-white">Yo‘l harakati nazorati tizimi</h1>
+        <p className="mt-1.5 text-[13px] text-white/60">
           Sun’iy intellekt yordamida avtomatlashtirilgan qoidabuzarliklarni aniqlash va monitoring qilish
         </p>
       </div>
@@ -53,41 +66,51 @@ function Hero() {
   );
 }
 
+const TONE_HEX: Record<IconTone, string> = {
+  blue: "#625fee",
+  green: "#10b981",
+  red: "#f43f5e",
+  amber: "#f59e0b",
+  violet: "#8b5cf6",
+  sky: "#0ea5e9",
+  pink: "#ec4899",
+  slate: "#94a3b8",
+};
+
 interface KpiCardProps {
   label: string;
   kpi: Kpi;
   icon: LucideIcon;
-  color: string;
+  tone: IconTone;
   format?: (value: number) => string;
   extra?: ReactNode;
   deltaPositiveIsGood?: boolean;
 }
 
-function KpiCard({ label, kpi, icon: Icon, color, format = formatNumber, extra, deltaPositiveIsGood = true }: KpiCardProps) {
+function KpiCard({ label, kpi, icon, tone, format = formatNumber, extra, deltaPositiveIsGood = true }: KpiCardProps) {
   const delta = kpi.delta_pct;
   const good = delta === null ? null : (delta >= 0) === deltaPositiveIsGood;
   return (
-    <div className="card flex flex-col gap-2 p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ backgroundColor: color }}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs text-slate-500">{label}</p>
-          <p className="text-2xl font-extrabold leading-tight text-slate-900">{format(kpi.value)}</p>
-        </div>
+    <div className="card relative flex flex-col p-4">
+      <span className="absolute right-3 top-3 text-slate-300" title={label}>
+        <Info className="h-4 w-4" />
+      </span>
+      <div className="flex items-center gap-3 pr-5">
+        <IconBadge icon={icon} tone={tone} />
+        <p className="truncate text-[22px] font-bold leading-tight tracking-tight text-navy-900">{format(kpi.value)}</p>
       </div>
-      <div className="flex items-end justify-between gap-2">
-        <div className="text-xs">
+      <p className="mt-2.5 truncate text-[13px] text-slate-500">{label}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="text-[11px]">
           {extra ??
             (delta !== null && (
-              <span className={cn("font-semibold", good ? "text-emerald-600" : "text-red-600")}>
+              <span className={cn("rounded-md px-1.5 py-0.5 font-semibold", good ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600")}>
                 {delta >= 0 ? "↑" : "↓"} {formatPct(Math.abs(delta))}
               </span>
             ))}
         </div>
-        <div className="w-24">
-          <Sparkline values={kpi.sparkline} color={color} />
+        <div className="w-20">
+          <Sparkline values={kpi.sparkline} color={TONE_HEX[tone]} />
         </div>
       </div>
     </div>
@@ -102,19 +125,19 @@ function KpiGrid() {
         const onlinePct = (kpis.active_cameras.value / Math.max(kpis.total_cameras, 1)) * 100;
         return (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-            <KpiCard label={t("kpi.totalVehicles")} kpi={kpis.total_vehicles} icon={Car} color="#10b981" />
+            <KpiCard label={t("kpi.totalVehicles")} kpi={kpis.total_vehicles} icon={Car} tone="green" />
             <KpiCard
               label={t("kpi.activeCameras")}
               kpi={kpis.active_cameras}
               icon={Camera}
-              color="#1f6feb"
+              tone="blue"
               format={(value) => `${formatNumber(value)} / ${kpis.total_cameras}`}
               extra={
-                <div className="w-28">
+                <div className="w-24">
                   <div className="h-1.5 rounded-full bg-slate-100">
-                    <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${onlinePct}%` }} />
+                    <div className="h-1.5 rounded-full bg-brand-600" style={{ width: `${onlinePct}%` }} />
                   </div>
-                  <span className="mt-1 block font-semibold text-emerald-600">{formatPct(onlinePct, 0)} online</span>
+                  <span className="mt-1 block font-semibold text-brand-600">{formatPct(onlinePct, 0)} online</span>
                 </div>
               }
             />
@@ -122,14 +145,14 @@ function KpiGrid() {
               label={t("kpi.violationsToday")}
               kpi={kpis.violations_today}
               icon={TriangleAlert}
-              color="#ef4444"
+              tone="red"
               deltaPositiveIsGood={false}
             />
             <KpiCard
               label={t("kpi.confirmedToday")}
               kpi={kpis.confirmed_today}
               icon={CheckCircle2}
-              color="#22c55e"
+              tone="violet"
               extra={
                 kpis.confirmed_today.secondary !== null && (
                   <span className="font-semibold text-emerald-600">{formatPct(kpis.confirmed_today.secondary)}</span>
@@ -140,7 +163,7 @@ function KpiGrid() {
               label={t("kpi.pendingToday")}
               kpi={kpis.pending_today}
               icon={Clock3}
-              color="#f59e0b"
+              tone="amber"
               extra={
                 kpis.pending_today.secondary !== null && (
                   <span className="font-semibold text-amber-600">{formatPct(kpis.pending_today.secondary)}</span>
@@ -151,9 +174,9 @@ function KpiGrid() {
               label={t("kpi.uptime")}
               kpi={kpis.uptime_pct}
               icon={Gauge}
-              color="#8b5cf6"
+              tone="pink"
               format={(value) => formatPct(value)}
-              extra={<span className="text-slate-500">So‘nggi 7 kun</span>}
+              extra={<span className="text-slate-400">7 kun</span>}
             />
           </div>
         );
@@ -164,7 +187,7 @@ function KpiGrid() {
 
 function CameraTile({ camera }: { camera: CameraListItem }) {
   return (
-    <Link to={`/cameras/${camera.id}`} className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:shadow-md">
+    <Link to={`/cameras/${camera.id}`} className="group overflow-hidden rounded-xl border border-line bg-white transition hover:-translate-y-0.5 hover:shadow-lift">
       <CameraPreview seed={camera.id} status={camera.status}>
         <span className="absolute left-2 top-2">
           <CameraStatusBadge status={camera.status} />

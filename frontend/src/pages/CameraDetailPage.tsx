@@ -32,10 +32,10 @@ function MetricsChart({ stats }: { stats: CameraStatistics }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-        <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+        <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
         <Tooltip />
         <Line yAxisId="left" dataKey="violations" name={t("nav.violations")} stroke="#ef4444" strokeWidth={2} dot={false} />
         <Line yAxisId="right" dataKey="fps" name="FPS" stroke="#16a34a" strokeWidth={1.5} dot={false} connectNulls />

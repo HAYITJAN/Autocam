@@ -261,7 +261,7 @@ export default function VehiclesPage() {
                           </td>
                           <td className="td">
                             {vehicle.vehicle_type ? (
-                              <span className="inline-flex items-center gap-1.5 text-sm">
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px]">
                                 <Car className="h-4 w-4" style={{ color: vehicle.vehicle_type.color }} />
                                 {vehicle.vehicle_type.name_uz}
                               </span>

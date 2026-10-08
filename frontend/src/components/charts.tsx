@@ -20,12 +20,23 @@ import { formatBucket, formatNumber, formatPct } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { HeatCell, Timeseries, TypeCount } from "@/lib/types";
 
-const FALLBACK_COLORS = ["#1f6feb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#f97316", "#64748b"];
+const FALLBACK_COLORS = ["#625fee", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#0ea5e9", "#f97316", "#64748b"];
+
+export const TOOLTIP_STYLE = {
+  contentStyle: {
+    borderRadius: 12,
+    border: "1px solid #eceef3",
+    boxShadow: "0 4px 12px rgba(16, 24, 40, 0.08)",
+    fontSize: 12,
+    padding: "8px 12px",
+  },
+  cursor: { fill: "rgba(98, 95, 238, 0.06)" },
+};
 
 export const colorAt = (color: string | null, index: number): string =>
   color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length] ?? "#64748b";
 
-export function Sparkline({ values, color = "#1f6feb" }: { values: number[]; color?: string }) {
+export function Sparkline({ values, color = "#625fee" }: { values: number[]; color?: string }) {
   const data = values.map((value, index) => ({ index, value }));
   const id = `spark-${color.replace("#", "")}`;
   return (
@@ -54,10 +65,10 @@ export function TimeseriesChart({ data, height = 280, stacked = false }: { data:
     return (
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-          <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
-          <Tooltip />
+          <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+          <Tooltip {...TOOLTIP_STYLE} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           {data.series.map((series, index) => (
             <Bar key={series.code} dataKey={series.code} name={series.name} stackId="a" fill={colorAt(series.color, index)} />
@@ -70,12 +81,12 @@ export function TimeseriesChart({ data, height = 280, stacked = false }: { data:
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-        <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <Tooltip />
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+        <Tooltip {...TOOLTIP_STYLE} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Line type="monotone" dataKey="total" name={t("common.total")} stroke="#1f6feb" strokeWidth={2.5} dot={false} />
+        <Line type="monotone" dataKey="total" name={t("common.total")} stroke="#625fee" strokeWidth={2.5} dot={false} />
         {data.series.slice(0, 4).map((series, index) => (
           <Line
             key={series.code}
@@ -103,11 +114,11 @@ export function DonutChart({ items, total, height = 220 }: { items: TypeCount[];
                 <Cell key={item.code} fill={colorAt(item.color, index)} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: number) => formatNumber(value)} />
+            <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatNumber(value)} />
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-semibold text-slate-900">{formatNumber(total)}</span>
+          <span className="text-xl font-bold text-navy-900">{formatNumber(total)}</span>
           <span className="text-xs text-slate-500">{t("common.total")}</span>
         </div>
       </div>
@@ -133,8 +144,8 @@ export function HorizontalBars({ items, height }: { items: { label: string; coun
     <ResponsiveContainer width="100%" height={height ?? Math.max(160, items.length * 34)}>
       <BarChart data={items} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
         <XAxis type="number" hide />
-        <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-        <Tooltip formatter={(value: number) => formatNumber(value)} />
+        <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
+        <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatNumber(value)} />
         <Bar dataKey="count" name={t("common.total")} radius={[0, 4, 4, 0]} barSize={16}>
           {items.map((item, index) => (
             <Cell key={item.label} fill={colorAt(item.color ?? null, index)} />
@@ -145,7 +156,7 @@ export function HorizontalBars({ items, height }: { items: { label: string; coun
   );
 }
 
-export function ColumnChart({ data, xKey, yKey, color = "#1f6feb", height = 240 }: {
+export function ColumnChart({ data, xKey, yKey, color = "#625fee", height = 240 }: {
   data: Record<string, number | string>[];
   xKey: string;
   yKey: string;
@@ -155,11 +166,11 @@ export function ColumnChart({ data, xKey, yKey, color = "#1f6feb", height = 240 
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-        <XAxis dataKey={xKey} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-        <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <Tooltip />
-        <Bar dataKey={yKey} name={t("common.total")} fill={color} radius={[4, 4, 0, 0]} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
+        <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+        <Tooltip {...TOOLTIP_STYLE} />
+        <Bar dataKey={yKey} name={t("common.total")} fill={color} radius={[6, 6, 0, 0]} maxBarSize={28} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -193,7 +204,7 @@ export function WeekHourHeatmap({ cells }: { cells: HeatCell[] }) {
                     key={hour}
                     title={`${count}`}
                     className="h-6 min-w-5 rounded"
-                    style={{ backgroundColor: `rgba(239, 68, 68, ${0.06 + (count / max) * 0.9})` }}
+                    style={{ backgroundColor: `rgba(98, 95, 238, ${0.06 + (count / max) * 0.9})` }}
                   />
                 );
               })}
