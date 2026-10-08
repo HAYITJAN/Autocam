@@ -492,7 +492,7 @@ avtocam/                                  # repository root (= smart-traffic)
     Dockerfile
   docker/
     nginx/nginx.conf  nginx/default.conf
-    postgres/init.sql                     # extensions: pg_trgm, btree_gin
+    postgres/init.sql                     # pg_trgm + <db>_test database
   docs/                                   # architecture docs + mockups
   docker-compose.yml                      # postgres, redis, backend, celery-worker, celery-beat, ai-service, frontend, nginx
   docker-compose.override.yml             # dev: hot reload, exposed ports, vite dev server
@@ -518,7 +518,7 @@ avtocam/                                  # repository root (= smart-traffic)
 ### 7.2 Backend (`backend/requirements.txt`)
 
 `fastapi`, `uvicorn[standard]` (multi-process via `--workers`), `pydantic>=2`, `pydantic-settings`, `email-validator`,
-`sqlalchemy[asyncio]>=2.0`, `asyncpg`, `alembic`, `redis>=5`, `celery[redis]>=5.4`,
+`sqlalchemy[asyncio]>=2.1`, `asyncpg`, `alembic`, `redis>=5`, `celery[redis]>=5.4`,
 `pyjwt`, `bcrypt`, `cryptography` (Fernet), `slowapi`, `httpx`, `orjson`, `structlog`,
 `python-multipart`, `filetype`, `pillow`, `boto3`, `reportlab`, `openpyxl`, `psutil`.
 Dev: `pytest`, `pytest-asyncio`, `pytest-cov`, `asgi-lifespan`, `ruff`, `mypy`.

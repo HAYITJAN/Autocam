@@ -21,6 +21,9 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Local scratch area
+/.scratch/
+
 # Runtime data
 /data/
 /storage/

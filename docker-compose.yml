@@ -32,8 +32,21 @@ services:
       timeout: 3s
       retries: 10
 
+  # One-shot schema migration; the API starts only after it succeeds.
+  migrate:
+    image: smart-traffic-backend
+    build:
+      context: ./backend
+    env_file: .env
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     <<: *restart
+    image: smart-traffic-backend
     build:
       context: ./backend
     env_file: .env
@@ -42,6 +55,8 @@ services:
     volumes:
       - evidence_storage:/data/storage
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:

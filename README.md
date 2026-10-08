@@ -21,7 +21,8 @@ Design documents live in [`docs/`](docs): [architecture](docs/ARCHITECTURE.md), 
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Foundation: repository, configuration, Docker, DB/Redis connectivity, error handling, health endpoints | done |
-| 2 | Data model, Alembic migrations, seed data | next |
+| 2 | Data model (31 tables), Alembic migrations, seed data | done |
+| 3 | Authentication and authorization | next |
 | 3–20 | See [roadmap](docs/ROADMAP.md) | planned |
 
 ## Repository layout
@@ -52,6 +53,30 @@ docker compose up --build
 
 `docker-compose.override.yml` is applied automatically in development (hot reload, exposed ports).
 For a production-like run use `docker compose -f docker-compose.yml up -d --build`.
+
+The one-shot `migrate` service runs `alembic upgrade head` before the backend starts. Load data with:
+
+```bash
+docker compose run --rm backend python -m scripts.seed_database          # reference data + admin
+docker compose run --rm backend python -m scripts.seed_database --demo   # + demo users and 30 days of history
+```
+
+Set `SEED_ADMIN_PASSWORD` (and `SEED_DEMO_PASSWORD`) in `.env` first, or let the seed print a generated
+password once (development only).
+
+## Database
+
+```bash
+cd backend
+alembic upgrade head                      # apply migrations (DATABASE_URL from .env)
+alembic downgrade base                    # drop everything created by migrations
+alembic revision --autogenerate -m "..."  # new migration after model changes
+alembic check                             # fails if models and migrations diverge
+python -m scripts.seed_database [--demo] [--seed 42] [--days 30] [--vehicles 2000]
+```
+
+The seed is idempotent: re-running inserts only missing rows and never overwrites admin edits.
+Schema details: [docs/DATABASE.md](docs/DATABASE.md).
 
 ## macOS setup
 
@@ -100,11 +125,18 @@ On Linux/macOS use `.venv/bin/...` instead of `.\.venv\Scripts\...`.
 cd backend
 .\.venv\Scripts\ruff check .
 .\.venv\Scripts\ruff format --check .
-.\.venv\Scripts\mypy app tests
+.\.venv\Scripts\mypy app scripts tests
 .\.venv\Scripts\pytest
 ```
 
 The same commands work in `ai-service/`.
+
+Integration tests (migration round trip, schema drift, seed idempotency) run only when
+`TEST_DATABASE_URL` points at a disposable database. The Docker PostgreSQL creates one automatically:
+
+```bash
+TEST_DATABASE_URL=postgresql+asyncpg://smart:<password>@localhost:5432/smart_traffic_test pytest
+```
 
 ## API conventions
 

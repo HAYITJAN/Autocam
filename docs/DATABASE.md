@@ -6,7 +6,8 @@ Conventions:
 * All timestamps are `timestamptz` in UTC. `created_at` defaults to `now()`; `updated_at` is maintained by the ORM.
 * Enums are PostgreSQL native enums (created and altered via Alembic).
 * Constraint naming convention: `pk_%(table)s`, `fk_%(table)s_%(column)s_%(referred_table)s`, `uq_…`, `ix_…`, `ck_…`.
-* Extensions: `pg_trgm` (fuzzy plate and name search), `btree_gin`.
+* Extensions: `pg_trgm` (fuzzy plate search). It is optional: the initial migration creates the extension and the two `*_plate_trgm` GIN indexes only when the server provides it (`pg_available_extensions`); otherwise plate search falls back to the B-tree unique index (prefix search).
+* Confidence values (`ai_confidence`, `detection_confidence`, `plate_confidence`, thresholds) are stored as fractions `0..1` (`numeric(5,4)`, CHECK-constrained), and converted to percentages only for display.
 * Soft delete (`deleted_at`) on `users` and `cameras` only, because audit and violations must keep referencing them.
 
 ---
@@ -295,7 +296,7 @@ erDiagram
         bigint location_id FK
         bigint vehicle_id FK
         bigint vehicle_type_id FK
-        bigint detection_id FK
+        bigint detection_id "soft ref (partitioned table)"
         bigint zone_id FK
         varchar plate_number
         varchar track_id
@@ -400,7 +401,7 @@ rollups `traffic_stats_hourly` and `violation_stats_hourly` (§3).
 ## 2. Table notes
 
 ### Identity and access
-* **roles / permissions / role_permissions**: seeded from `core/permissions.py`. `is_system` roles cannot be deleted; their permissions can be edited.
+* **roles / permissions / role_permissions**: seeded from `app/seed/reference.py`. `is_system` roles cannot be deleted; their permissions can be edited.
 * **users**: `username` and `email` are unique among non-deleted rows (`WHERE deleted_at IS NULL`). Incrementing `token_version` invalidates all existing access tokens (used on block, password reset, and role change).
 * **user_sessions**: one row per refresh token. Rotation creates a new row in the same `family_id` and revokes the old one. Presenting a revoked token revokes the whole family. Login history = sessions + `LOGIN_*` audit rows.
 
@@ -421,6 +422,7 @@ rollups `traffic_stats_hourly` and `violation_stats_hourly` (§3).
 
 ### Violations
 * **code**: generated from the sequence `violation_code_seq` → `VL-` + zero-padded 6+ digits.
+* **detection_id**: plain `bigint` without a foreign key. `vehicle_detections` is partitioned with PK `(id, detected_at)`, so a single-column FK is impossible; the link is resolved in the service layer and may dangle after detection partitions are dropped by retention.
 * **idempotency_key**: `camera_code:track_id:rule_code:occurred_at_bucket`, so an AI retry from the outbox never creates duplicates.
 * **Status machine** (enforced in `violation_service`):
 
@@ -485,7 +487,9 @@ Dashboard and analytics read rollups for ranges > 24 h and raw tables (indexed) 
 
 ## 5. Partitioning and retention
 
-* Monthly range partitions for `vehicle_detections` and `camera_health_logs`, created 3 months ahead by a Celery task. Old partitions are detached and dropped according to `system_settings.retention.*`.
+* Monthly range partitions (UTC month boundaries) for `vehicle_detections` and `camera_health_logs`, named `<table>_yYYYYmMM`. The initial migration creates the previous, current and next two months plus a `<table>_default` partition, and installs `ensure_monthly_partition(parent regclass, month date)`, which is idempotent. A Celery task calls it to keep 3 months ahead. Rows must not accumulate in the default partition, because a new monthly partition cannot be attached while the default holds rows for that range.
+* Ids of partitioned tables come from dedicated sequences (`camera_health_logs_id_seq`, `vehicle_detections_id_seq`) owned by the parent table.
+* Old partitions are detached and dropped according to `system_settings.retention.*`.
 * Evidence files are removed after `cameras.retention_days`, **except** for violations in `CONFIRMED` status (kept for the legal retention period setting).
 
 ## 6. Seed data (`scripts/seed_database.py`, idempotent)
@@ -493,12 +497,12 @@ Dashboard and analytics read rollups for ranges > 24 h and raw tables (indexed) 
 | Data | Content |
 |---|---|
 | Roles + permissions | 5 roles, 21 permissions, default matrix (below) |
-| Users | `admin` (ADMINISTRATOR) plus one demo user per role. Passwords come from env/CLI; no default password in production. |
+| Users | `admin` (ADMINISTRATOR); with `--demo` also `supervisor`, `operator`, `analyst`, `viewer`. Passwords come from `SEED_ADMIN_PASSWORD` / `SEED_DEMO_PASSWORD`. Outside production a random password is generated and printed once; in production a missing password aborts the seed. |
 | Districts / locations | 12 Tashkent districts, ~30 real intersections with coordinates |
 | Cameras | 45 cameras (`CAM-001…CAM-045`) across locations with Wi-Fi/4G/Ethernet connections, zones, and traffic lights |
 | Types | vehicle types (5), violation types (5 core + LANE_VIOLATION, NO_SEATBELT reserved and inactive) |
 | AI models | `yolov8n-vehicles 1.0` (active), `uz-lpr 1.0` |
-| Demo history (`--demo`) | ~2,000 vehicles, 30 days of violations with realistic hourly/daily distribution, evidence placeholders, health history, notifications |
+| Demo history (`--demo`, refused in production) | Deterministic (`--seed`): ~2,000 vehicles, 30 days of violations (~5.5k) with rush-hour/weekday profile and review timelines, camera statuses, 7 days of hourly health samples, notifications. Skipped when vehicles already exist. Evidence files are produced later by the AI simulator through the real ingest API, not by the seed. |
 
 ### Default permission matrix
 
