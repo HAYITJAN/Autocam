@@ -19,6 +19,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/format";
 import { t, tDynamic } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 import type { CameraStatus, PageMeta, Severity, TimeRange, VehicleStatus, ViolationStatus } from "@/lib/types";
 
 // ------------------------------------------------------------------ text
@@ -314,10 +315,10 @@ export const VehicleStatusBadge = ({ status }: { status: VehicleStatus }) => (
 
 export const SeverityBadge = ({ severity }: { severity: Severity }) => <Badge tone={severityTone[severity]}>{tDynamic("severity", severity)}</Badge>;
 
-export function TypeChip({ name, color }: { name: string; color: string | null }) {
+export function TypeChip({ name, code, color }: { name: string; code?: string; color: string | null }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[13px]">
-      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color ?? "#a3a3a3" }} />
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(code, color) }} />
       {name}
     </span>
   );

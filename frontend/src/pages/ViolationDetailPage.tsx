@@ -118,7 +118,7 @@ export default function ViolationDetailPage() {
                 <CardHeader title={t("violation.details")} />
                 <dl className="divide-y divide-line px-5 pb-3">
                   <Field label={t("violation.type")}>
-                    <TypeChip name={v.type.name_uz} color={v.type.color} />
+                    <TypeChip name={v.type.name_uz} code={v.type.code} color={v.type.color} />
                   </Field>
                   <Field label="Daraja">
                     <SeverityBadge severity={v.type.severity} />

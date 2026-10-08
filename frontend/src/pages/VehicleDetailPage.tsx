@@ -113,7 +113,7 @@ export default function VehicleDetailPage() {
                         <Link to={`/violations/${item.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-soft">
                           <span className="w-40 text-sm text-ink/70">{formatDateTime(item.occurred_at)}</span>
                           <span className="flex-1">
-                            <TypeChip name={item.type.name_uz} color={item.type.color} />
+                            <TypeChip name={item.type.name_uz} code={item.type.code} color={item.type.color} />
                           </span>
                           <span className="font-mono text-xs text-mute">{item.camera.code}</span>
                           <ViolationStatusBadge status={item.status} />

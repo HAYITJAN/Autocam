@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { cn, formatConfidence, formatDateTime, formatNumber, formatPct, toIsoEnd, toIsoStart } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 import type { ViolationStatus } from "@/lib/types";
 
 type StatusTab = ViolationStatus | "";
@@ -50,7 +51,7 @@ function ViolationPanel({ id, onClose }: { id: number; onClose: () => void }) {
               </Field>
               <Field label={t("violation.type")}>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: v.type.color }} />
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: categoryColor(v.type.code, v.type.color) }} />
                   {v.type.name_uz}
                 </span>
               </Field>
@@ -286,7 +287,7 @@ export default function ViolationsPage() {
                             <span className="inline-flex items-center gap-2 text-sm">
                               <span
                                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
-                                style={{ backgroundColor: item.type.color }}
+                                style={{ backgroundColor: categoryColor(item.type.code, item.type.color) }}
                               >
                                 <TriangleAlert className="h-3.5 w-3.5" />
                               </span>

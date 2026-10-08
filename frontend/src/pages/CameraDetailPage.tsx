@@ -1,11 +1,9 @@
 import { ArrowLeft, Camera } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
 import { useCamera, useCameraEvents, useCameraStatistics } from "@/api/queries";
 import { CameraPreview } from "@/components/CameraPreview";
-import { DonutChart } from "@/components/charts";
+import { ACCENT_DEEP, DonutChart, HatchedColumns, INK, MetricArea } from "@/components/charts";
 import {
   Card,
   CardHeader,
@@ -19,35 +17,55 @@ import {
   TypeChip,
   ViolationStatusBadge,
 } from "@/components/ui";
-import { formatBucket, formatDateTime, formatNumber, formatPct, formatTime } from "@/lib/format";
+import { cn, formatBucket, formatDateTime, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { CameraStatistics, TimeRange } from "@/lib/types";
 
+type Metric = "violations" | "fps" | "latency";
+
+const METRICS: { value: Metric; label: string }[] = [
+  { value: "violations", label: "Qoidabuzarliklar" },
+  { value: "fps", label: "FPS" },
+  { value: "latency", label: "Kechikish" },
+];
+
+/** One metric at a time: three series with different units on twin axes were unreadable. */
 function MetricsChart({ stats }: { stats: CameraStatistics }) {
+  const [metric, setMetric] = useState<Metric>("violations");
   const bucket = stats.range === "24h" ? "hour" : "day";
-  const rows = stats.violations_series.map((point, index) => ({
-    label: formatBucket(point.t, bucket),
-    violations: point.value ?? 0,
-    fps: stats.fps_series[index]?.value ?? null,
-    latency: stats.latency_series[index]?.value ?? null,
-  }));
+  const source = metric === "violations" ? stats.violations_series : metric === "fps" ? stats.fps_series : stats.latency_series;
+  const points = source.map((point) => ({ label: formatBucket(point.t, bucket), value: point.value }));
+  const values = points.map((point) => point.value).filter((value): value is number => value !== null);
+  const summary =
+    metric === "violations"
+      ? `${formatNumber(values.reduce((sum, value) => sum + value, 0))} ta`
+      : values.length
+        ? `${(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(metric === "fps" ? 1 : 0)}${metric === "fps" ? " FPS" : " ms"} o‘rtacha`
+        : "ma’lumot yo‘q";
+
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#ececea" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} />
-        <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} />
-        <Tooltip
-          contentStyle={{ background: "#121212", border: "none", borderRadius: 14, color: "#fff", fontSize: 12 }}
-          itemStyle={{ color: "#fff" }}
-          labelStyle={{ color: "rgba(255,255,255,0.6)" }}
-        />
-        <Line yAxisId="left" dataKey="violations" name={t("nav.violations")} stroke="#121212" strokeWidth={2} dot={false} />
-        <Line yAxisId="right" dataKey="fps" name="FPS" stroke="#5ccb3a" strokeWidth={1.5} dot={false} connectNulls />
-        <Line yAxisId="right" dataKey="latency" name={`${t("camera.latency")} (ms)`} stroke="#b4b4b0" strokeWidth={1.5} dot={false} connectNulls />
-      </LineChart>
-    </ResponsiveContainer>
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="segmented">
+          {METRICS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              className={cn("segmented-item", metric === item.value && "segmented-active")}
+              onClick={() => setMetric(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-sm font-semibold text-ink">{summary}</span>
+      </div>
+      {metric === "violations" ? (
+        <HatchedColumns height={240} showAverage data={points.map((point) => ({ label: point.label, value: point.value ?? 0 }))} />
+      ) : (
+        <MetricArea height={240} data={points} color={metric === "fps" ? ACCENT_DEEP : INK} unit={metric === "fps" ? "FPS" : "ms"} />
+      )}
+    </div>
   );
 }
 
@@ -177,7 +195,7 @@ export default function CameraDetailPage() {
                         <Link to={`/violations/${item.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-soft">
                           <span className="w-12 text-sm text-ink/70">{formatTime(item.occurred_at)}</span>
                           <span className="flex-1">
-                            <TypeChip name={item.type.name_uz} color={item.type.color} />
+                            <TypeChip name={item.type.name_uz} code={item.type.code} color={item.type.color} />
                           </span>
                           <PlateNumber value={item.plate_number} />
                           <ViolationStatusBadge status={item.status} />

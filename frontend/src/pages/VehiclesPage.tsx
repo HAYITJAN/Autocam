@@ -21,6 +21,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { cn, daysAgoInput, formatDateTime, formatNumber, formatRelative, toIsoEnd, toIsoStart } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 import type { VehicleDetail, VehicleListItem, VehicleStatus } from "@/lib/types";
 import { useHasPermission } from "@/stores/auth";
 
@@ -112,7 +113,7 @@ function VehiclePanel({ id, onClose }: { id: number; onClose: () => void }) {
                     {data.items.slice(0, 5).map((item) => (
                       <li key={item.id}>
                         <Link to={`/violations/${item.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs hover:bg-soft">
-                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.type.color }} />
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(item.type.code, item.type.color) }} />
                           <span className="min-w-0 flex-1 truncate text-ink/80">{item.type.name_uz}</span>
                           <span className="text-mute">{formatDateTime(item.occurred_at)}</span>
                         </Link>
@@ -262,7 +263,7 @@ export default function VehiclesPage() {
                           <td className="td">
                             {vehicle.vehicle_type ? (
                               <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px]">
-                                <Car className="h-4 w-4" style={{ color: vehicle.vehicle_type.color }} />
+                                <Car className="h-4 w-4" style={{ color: categoryColor(vehicle.vehicle_type.code, vehicle.vehicle_type.color) }} />
                                 {vehicle.vehicle_type.name_uz}
                               </span>
                             ) : (

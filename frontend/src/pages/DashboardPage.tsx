@@ -44,6 +44,7 @@ import {
 } from "@/components/ui";
 import { cn, DISPLAY_TZ, formatBucket, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 import type { CameraListItem, DashboardKpis, TimeRange } from "@/lib/types";
 import { useAuthStore, useHasPermission } from "@/stores/auth";
 
@@ -57,10 +58,6 @@ function todayLabel(): string {
       .map((part) => [part.type, part.value]),
   );
   return `${parts.day} ${MONTHS[Number(parts.month) - 1] ?? ""}, ${parts.year}`;
-}
-
-function shortLabel(text: string, max = 14): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 // ------------------------------------------------------------ today card
@@ -251,7 +248,7 @@ function PerformanceCard({ kpis }: { kpis: DashboardKpis }) {
       </div>
       <div className="px-3 pb-4 pt-2">
         <QueryView query={query} isEmpty={(data) => data.total === 0}>
-          {(data) => <HatchedColumns height={260} data={data.items.map((item) => ({ label: shortLabel(item.name), value: item.count }))} />}
+          {(data) => <HatchedColumns height={270} wrapLabels data={data.items.map((item) => ({ label: item.name, value: item.count }))} />}
         </QueryView>
       </div>
     </Card>
@@ -311,7 +308,7 @@ function RecentViolations() {
               {items.map((item) => (
                 <li key={item.id}>
                   <Link to={`/violations/${item.id}`} className="flex items-center gap-3 rounded-2xl bg-soft/70 px-3 py-2.5 transition hover:bg-soft">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: item.type.color }}>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: categoryColor(item.type.code, item.type.color) }}>
                       <TriangleAlert className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">

@@ -11,10 +11,11 @@ import {
   useViolationsTimeseries,
 } from "@/api/queries";
 import { CameraPreview } from "@/components/CameraPreview";
-import { ColumnChart, DonutChart } from "@/components/charts";
+import { DonutChart, VolumeBars } from "@/components/charts";
 import { Card, CardHeader, CameraStatusBadge, KpiTile, Pagination, PageHeader, QueryView, ViolationStatusBadge } from "@/components/ui";
 import { cn, formatBucket, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 import type { CameraListItem, CameraStatus } from "@/lib/types";
 
 const GRID_OPTIONS = [4, 6, 9] as const;
@@ -69,7 +70,7 @@ function RecentEvents() {
                 <Link
                   to={`/violations/${item.id}`}
                   className="flex gap-3 rounded-xl border border-line border-l-4 p-2 hover:bg-soft"
-                  style={{ borderLeftColor: item.type.color }}
+                  style={{ borderLeftColor: categoryColor(item.type.code, item.type.color) }}
                 >
                   <CameraPreview seed={item.camera.id * 7 + item.id} status="ONLINE" className="w-20 shrink-0 rounded-md" />
                   <div className="min-w-0 flex-1 text-xs">
@@ -131,16 +132,15 @@ function Last24h() {
   const query = useViolationsTimeseries("24h");
   return (
     <Card>
-      <CardHeader title="Qoidabuzarliklar oqimi" subtitle="So‘nggi 24 soat" />
-      <div className="p-3">
+      <CardHeader
+        title="Qoidabuzarliklar oqimi"
+        subtitle="So‘nggi 24 soat, soatlar bo‘yicha"
+        action={query.data && <span className="text-lg font-semibold text-ink">{formatNumber(query.data.totals.reduce((sum, value) => sum + value, 0))}</span>}
+      />
+      <div className="px-4 pb-4">
         <QueryView query={query}>
           {(data) => (
-            <ColumnChart
-              height={180}
-              xKey="hour"
-              yKey="count"
-              data={data.buckets.map((bucket, index) => ({ hour: formatBucket(bucket, data.bucket), count: data.totals[index] ?? 0 }))}
-            />
+            <VolumeBars height={170} data={data.buckets.map((bucket, index) => ({ label: formatBucket(bucket, data.bucket), value: data.totals[index] ?? 0 }))} />
           )}
         </QueryView>
       </div>

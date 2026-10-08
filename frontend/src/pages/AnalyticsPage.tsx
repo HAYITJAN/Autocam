@@ -1,7 +1,5 @@
 import { CalendarDays, Car, CheckCircle2, Target, TriangleAlert, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
 import {
   useAnalyticsOverview,
   useByDistrict,
@@ -14,7 +12,16 @@ import {
   useWeekdayHour,
   type Period,
 } from "@/api/queries";
-import { ColumnChart, DonutChart, HorizontalBars, TimeseriesChart, WeekHourHeatmap } from "@/components/charts";
+import {
+  ACCENT_DEEP,
+  ColumnChart,
+  DonutChart,
+  HorizontalBars,
+  INK,
+  StackedColumns,
+  TimeseriesChart,
+  WeekHourHeatmap,
+} from "@/components/charts";
 import { Card, CardHeader, CameraStatusBadge, KpiTile, PageHeader, QueryView } from "@/components/ui";
 import { cn, daysAgoInput, formatDay, formatNumber, formatPct, toIsoEnd, toIsoStart } from "@/lib/format";
 import { t } from "@/lib/i18n";
@@ -26,13 +33,6 @@ const PERIODS = [
   { days: 30, label: t("range.30d") },
   { days: 90, label: "90 kun" },
 ];
-
-const INK_TOOLTIP = {
-  contentStyle: { background: "#121212", border: "none", borderRadius: 14, color: "#fff", fontSize: 12 },
-  itemStyle: { color: "#fff" },
-  labelStyle: { color: "rgba(255,255,255,0.6)" },
-  cursor: { fill: "rgba(0,0,0,0.04)" },
-};
 
 function Overview({ period }: { period: Period }) {
   const query = useAnalyticsOverview(period);
@@ -151,7 +151,14 @@ export default function AnalyticsPage() {
           <CardHeader title={t("analytics.byHour")} subtitle="Eng yuqori soat ajratib ko‘rsatiladi" />
           <div className="p-4">
             <QueryView query={byHour}>
-              {(data) => <ColumnChart data={data.map((bucket) => ({ hour: `${bucket.hour}`, count: bucket.count }))} xKey="hour" yKey="count" />}
+              {(data) => (
+                <ColumnChart
+                  showAverage
+                  data={data.map((bucket) => ({ hour: `${String(bucket.hour).padStart(2, "0")}:00`, count: bucket.count }))}
+                  xKey="hour"
+                  yKey="count"
+                />
+              )}
             </QueryView>
           </div>
         </Card>
@@ -183,34 +190,19 @@ export default function AnalyticsPage() {
           <div className="p-4">
             <QueryView query={outcomes}>
               {(data) => (
-                <div className="space-y-4">
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart
-                      data={data.days.map((day) => ({ label: formatDay(day.day), confirmed: day.confirmed, rejected: day.rejected }))}
-                      margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ececea" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                      <Tooltip {...INK_TOOLTIP} />
-                      <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                      <Bar dataKey="confirmed" name={t("violation.status.CONFIRMED")} stackId="a" fill="#5ccb3a" />
-                      <Bar dataKey="rejected" name={t("violation.status.REJECTED")} stackId="a" fill="#121212" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="space-y-5">
+                  <StackedColumns
+                    height={220}
+                    rows={data.days.map((day) => ({ label: formatDay(day.day), confirmed: day.confirmed, rejected: day.rejected }))}
+                    series={[
+                      { key: "confirmed", name: t("violation.status.CONFIRMED"), color: ACCENT_DEEP },
+                      { key: "rejected", name: t("violation.status.REJECTED"), color: INK },
+                    ]}
+                  />
                   {data.rejection_reasons.length > 0 && (
                     <div>
-                      <div className="mb-2 text-sm font-medium text-ink/80">{t("analytics.rejectionReasons")}</div>
-                      <ul className="space-y-1 text-sm">
-                        {data.rejection_reasons.map((reason) => (
-                          <li key={reason.code} className="flex justify-between">
-                            <span className="text-ink/70">{reason.name}</span>
-                            <span className="text-mute">
-                              {reason.count} · {formatPct(reason.pct)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="mb-3 text-[13px] font-semibold text-ink">{t("analytics.rejectionReasons")}</div>
+                      <HorizontalBars items={data.rejection_reasons.map((reason) => ({ label: reason.name, count: reason.count, color: INK }))} />
                     </div>
                   )}
                 </div>

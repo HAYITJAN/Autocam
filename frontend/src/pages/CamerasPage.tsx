@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import { cn, formatDateTime, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 import type { CameraListItem, CameraStatus, CameraType } from "@/lib/types";
 
 const CONNECTION_LABELS: Record<string, string> = { WIFI: "Wi-Fi", LTE_4G: "4G LTE", ETHERNET: "Ethernet" };
@@ -172,7 +173,7 @@ function CameraPanel({ id, onClose }: { id: number; onClose: () => void }) {
                       <li key={item.id}>
                         <Link to={`/violations/${item.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs hover:bg-soft">
                           <span className="w-10 text-mute">{formatTime(item.occurred_at)}</span>
-                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.type.color }} />
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(item.type.code, item.type.color) }} />
                           <span className="min-w-0 flex-1 truncate text-ink/80">{item.type.name_uz}</span>
                           <PlateNumber value={item.plate_number} />
                         </Link>
