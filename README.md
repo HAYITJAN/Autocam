@@ -76,6 +76,7 @@ alembic downgrade base                    # drop everything created by migration
 alembic revision --autogenerate -m "..."  # new migration after model changes
 alembic check                             # fails if models and migrations diverge
 python -m scripts.seed_database [--demo] [--seed 42] [--days 30] [--vehicles 2000]
+python -m scripts.set_password admin      # prompt for a new password, unlock, sign out all sessions
 ```
 
 The seed is idempotent: re-running inserts only missing rows and never overwrites admin edits.
