@@ -77,7 +77,11 @@ alembic revision --autogenerate -m "..."  # new migration after model changes
 alembic check                             # fails if models and migrations diverge
 python -m scripts.seed_database [--demo] [--seed 42] [--days 30] [--vehicles 2000]
 python -m scripts.set_password admin      # prompt for a new password, unlock, sign out all sessions
+python -m scripts.set_password --demo     # same for every demo user (--from-env VAR: non-interactive)
 ```
+
+On Vercel the build syncs demo users' passwords to `SEED_DEMO_PASSWORD`, so rotating it is
+"change the variable, redeploy"; the admin password is never touched by the build.
 
 The seed is idempotent: re-running inserts only missing rows and never overwrites admin edits.
 Schema details: [docs/DATABASE.md](docs/DATABASE.md).

@@ -4,6 +4,8 @@
 # DB_MIGRATE_ON_BUILD=1   run `alembic upgrade head` and the idempotent seed against DATABASE_URL
 # DEMO_SEED=1 (default)   also load demo users and 30 days of demo history
 # SEED_ADMIN_PASSWORD / SEED_DEMO_PASSWORD are required so no generated password lands in build logs.
+# Demo users' passwords follow SEED_DEMO_PASSWORD: change it and redeploy to rotate them.
+# The admin password is only set on creation (rotate it with scripts.set_password).
 set -euo pipefail
 
 npm run build --prefix frontend
@@ -30,6 +32,7 @@ cd backend
 if [ "${DEMO_SEED:-1}" = "1" ]; then
   : "${SEED_DEMO_PASSWORD:?SEED_DEMO_PASSWORD must be set}"
   "$VENV/bin/python" -m scripts.seed_database --demo
+  "$VENV/bin/python" -m scripts.set_password --demo --from-env SEED_DEMO_PASSWORD
 else
   "$VENV/bin/python" -m scripts.seed_database
 fi

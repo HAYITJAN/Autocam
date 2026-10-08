@@ -9,6 +9,7 @@ import os
 import random
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -20,11 +21,13 @@ from sqlalchemy import Connection, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from alembic import command
+from app.core.security import verify_password
 from app.db.base import Base
 from app.models import Camera, User, Vehicle, Violation, ViolationEvent
 from app.seed.base import UserSeed, seed_base
 from app.seed.demo import seed_demo
 from app.seed.reference import ADMIN_ROLE
+from scripts.set_password import set_passwords
 
 pytestmark = pytest.mark.integration
 
@@ -125,6 +128,28 @@ class TestMigrationAndSeed:
             return cameras, users
 
         assert _run(counts) == (45, 1)
+
+    def test_set_passwords_rotates_only_changed_users(self) -> None:
+        async def seed(session: AsyncSession) -> None:
+            await seed_base(session, users=[_admin()], allow_generated_passwords=False)
+
+        _run(seed)
+        rotate = partial(set_passwords, usernames=["admin", "ghost"], password="rotated-pass-12345")
+
+        assert _run(rotate) == {"admin": "updated", "ghost": "not found"}
+        assert _run(rotate) == {"admin": "unchanged", "ghost": "not found"}
+
+        async def admin(session: AsyncSession) -> tuple[str, int]:
+            user = await session.scalar(select(User).where(User.username == "admin"))
+            assert user is not None
+            return user.password_hash, user.token_version
+
+        password_hash, token_version = _run(admin)
+        assert verify_password("rotated-pass-12345", password_hash)
+        assert token_version == 1
+
+        restore = partial(set_passwords, usernames=["admin"], password="integration-pass-123")
+        assert _run(restore) == {"admin": "updated"}
 
     def test_seed_requires_password_when_generation_is_disabled(self) -> None:
         async def seed(session: AsyncSession) -> None:
