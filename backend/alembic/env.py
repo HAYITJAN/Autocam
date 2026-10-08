@@ -10,6 +10,7 @@ import app.models  # noqa: F401  (registers all tables on Base.metadata)
 from alembic import context
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.session import serverless_connect_args
 
 config = context.config
 if config.config_file_name is not None:
@@ -65,7 +66,8 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    engine = create_async_engine(database_url(), poolclass=pool.NullPool)
+    connect_args = serverless_connect_args() if get_settings().serverless else {}
+    engine = create_async_engine(database_url(), poolclass=pool.NullPool, connect_args=connect_args)
     async with engine.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await engine.dispose()

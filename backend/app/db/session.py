@@ -1,5 +1,7 @@
 from collections.abc import AsyncIterator
 from functools import lru_cache
+from typing import Any
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -12,16 +14,31 @@ from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 
 
+def serverless_connect_args() -> dict[str, Any]:
+    """asyncpg options for hosted Postgres behind a transaction pooler (Neon/Supabase PgBouncer).
+
+    Pooled connections change between transactions, so prepared statements must not be
+    cached or reused by name.
+    """
+    return {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+    }
+
+
 @lru_cache
 def get_engine() -> AsyncEngine:
     settings = get_settings()
-    connect_args = {"server_settings": {"application_name": "smart-traffic-backend"}}
+    connect_args: dict[str, Any] = {
+        "server_settings": {"application_name": "smart-traffic-backend"}
+    }
     if settings.serverless:
         return create_async_engine(
             settings.database_url,
             poolclass=NullPool,
             echo=settings.database_echo,
-            connect_args=connect_args,
+            connect_args=connect_args | serverless_connect_args(),
         )
     return create_async_engine(
         settings.database_url,
