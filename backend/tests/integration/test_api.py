@@ -20,6 +20,7 @@ from sqlalchemy.pool import NullPool
 
 from alembic import command
 from app.db.session import get_db_session
+from app.seed import reference as ref
 from app.seed.base import UserSeed, seed_base
 from app.seed.demo import seed_demo
 from app.seed.reference import ADMIN_ROLE
@@ -201,6 +202,17 @@ class TestReadEndpoints:
     async def test_aggregations_respond(self, api: AsyncClient, path: str) -> None:
         headers = await _login(api, "viewer")
         assert _data(await api.get(path, headers=headers)) is not None
+
+    async def test_map_cameras_sit_on_road_points(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        cameras = _data(await api.get("/api/v1/map/cameras", headers=headers))
+        road_points = {(loc.lat, loc.lng) for loc in ref.LOCATIONS} | {
+            loc.alt for loc in ref.LOCATIONS if loc.alt
+        }
+        points = [(c["latitude"], c["longitude"]) for c in cameras]
+        assert len(points) == ref.CAMERA_COUNT
+        assert len(set(points)) == len(points)
+        assert set(points) <= road_points
 
     async def test_invalid_period_is_422(self, api: AsyncClient) -> None:
         headers = await _login(api, "viewer")

@@ -484,7 +484,9 @@ class InsightsService:
             await self.session.execute(
                 select(
                     Camera.id, Camera.code, Camera.name, Camera.status,
-                    Location.latitude, Location.longitude, Location.name, District.name, today.c.n,
+                    func.coalesce(Camera.latitude, Location.latitude),
+                    func.coalesce(Camera.longitude, Location.longitude),
+                    Location.name, District.name, today.c.n,
                 )
                 .join(Location, Camera.location_id == Location.id)
                 .join(District, Location.district_id == District.id)
@@ -493,7 +495,8 @@ class InsightsService:
                 .order_by(Camera.code)
             )
         ).all()  # fmt: skip
-        # Cameras sharing a location get a small deterministic offset so markers do not overlap.
+        # Cameras without their own mounting point that share a location get a small
+        # deterministic offset so markers do not overlap.
         seen: dict[tuple[float, float], int] = {}
         result = []
         for i, code, name, status, lat, lng, loc, district, n in rows:

@@ -346,10 +346,14 @@ async def _seed_cameras(
         location = ref.LOCATIONS[slot]
         camera_type = _camera_type(index, location.location_type)
         direction = float((index * 37) % 360)
+        opposite = index // len(ref.LOCATIONS) % 2 == 1
+        lat, lng = (location.alt if opposite else None) or (location.lat, location.lng)
         camera = Camera(
             code=code,
-            name=f"{location.name} ({CAMERA_DIRECTIONS[index // len(ref.LOCATIONS) % 2]})",
+            name=f"{location.name} ({CAMERA_DIRECTIONS[int(opposite)]})",
             location_id=location_ids[slot],
+            latitude=lat,
+            longitude=lng,
             camera_type=camera_type,
             ip_address=f"10.20.{index // 200}.{10 + index % 200}",
             port=554,

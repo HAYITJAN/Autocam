@@ -21,7 +21,7 @@ from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin
-from app.db.types import Degrees, IdentityPK, Percent, json_column, pg_enum
+from app.db.types import Coordinate, Degrees, IdentityPK, Percent, json_column, pg_enum
 from app.models.enums import (
     CameraStatus,
     CameraType,
@@ -82,6 +82,9 @@ class Camera(IdentityPK, TimestampMixin, SoftDeleteMixin, Base):
     )
     speed_limit_kmh: Mapped[int] = mapped_column(SmallInteger, default=60, server_default="60")
     road_direction_deg: Mapped[float | None] = mapped_column(Degrees)
+    # Mounting point on the road; NULL means the camera sits at its location's point.
+    latitude: Mapped[float | None] = mapped_column(Coordinate)
+    longitude: Mapped[float | None] = mapped_column(Coordinate)
     ai_config: Mapped[dict[str, Any]] = json_column()
     installed_at: Mapped[datetime | None]
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(index=True)

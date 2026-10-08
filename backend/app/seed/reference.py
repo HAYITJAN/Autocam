@@ -97,50 +97,72 @@ DISTRICTS: tuple[DistrictSeed, ...] = (
 
 @dataclass(frozen=True, slots=True)
 class LocationSeed:
+    """A point on a real road (snapped to OpenStreetMap road geometry).
+
+    `alt` is a second mounting point ~35 m along the main road, used by the
+    camera watching the opposite direction at the same location.
+    """
+
     district: str
     name: str
     lat: float
     lng: float
     location_type: LocationType = LocationType.INTERSECTION
     address: str | None = None
+    alt: tuple[float, float] | None = None
 
 
 _I = LocationType.INTERSECTION
 _S = LocationType.STREET
 _H = LocationType.HIGHWAY
 
+
+def _loc(
+    district: str,
+    name: str,
+    point: tuple[float, float],
+    alt: tuple[float, float],
+    location_type: LocationType = LocationType.INTERSECTION,
+) -> LocationSeed:
+    return LocationSeed(district, name, point[0], point[1], location_type, alt=alt)
+
+
+# Coordinates are road nodes from OpenStreetMap (© OpenStreetMap contributors, ODbL):
+# intersections sit on the junction node of the named streets, other locations on the road line.
+# fmt: off
 LOCATIONS: tuple[LocationSeed, ...] = (
-    LocationSeed("YUNUSOBOD", "Amir Temur — Shahrisabz chorrahasi", 41.3160, 69.2790),
-    LocationSeed("YUNUSOBOD", "Yunusobod bozori chorrahasi", 41.3640, 69.2870),
-    LocationSeed("YUNUSOBOD", "Bog‘ishamol — Amir Temur chorrahasi", 41.3420, 69.2850),
-    LocationSeed("MIRZO_ULUGBEK", "Buyuk Ipak yo‘li chorrahasi", 41.3260, 69.3290),
-    LocationSeed("MIRZO_ULUGBEK", "Mirzo Ulug‘bek — Parkent chorrahasi", 41.3200, 69.3300),
-    LocationSeed("MIRZO_ULUGBEK", "Qorasuv chorrahasi", 41.3460, 69.3600),
-    LocationSeed("MIROBOD", "Oybek chorrahasi", 41.2990, 69.2700),
-    LocationSeed("MIROBOD", "Mirobod — Shota Rustaveli chorrahasi", 41.2960, 69.2800),
-    LocationSeed("MIROBOD", "Toshkent vokzali oldi", 41.2920, 69.2880, _S),
-    LocationSeed("YAKKASAROY", "Bobur — Shota Rustaveli chorrahasi", 41.2850, 69.2550),
-    LocationSeed("YAKKASAROY", "Kichik halqa yo‘li — Bobur", 41.2770, 69.2500, _H),
-    LocationSeed("CHILONZOR", "Bunyodkor — Chilonzor chorrahasi", 41.2750, 69.2040),
-    LocationSeed("CHILONZOR", "Novza chorrahasi", 41.2930, 69.2230),
-    LocationSeed("CHILONZOR", "Muqimiy — Bunyodkor chorrahasi", 41.2860, 69.2250),
-    LocationSeed("SHAYXONTOHUR", "Chorsu chorrahasi", 41.3260, 69.2360),
-    LocationSeed("SHAYXONTOHUR", "Navoiy — Furqat chorrahasi", 41.3150, 69.2500),
-    LocationSeed("SHAYXONTOHUR", "Paxtakor chorrahasi", 41.3165, 69.2675),
-    LocationSeed("OLMAZOR", "Beruniy — Qorasaroy chorrahasi", 41.3450, 69.2110),
-    LocationSeed("OLMAZOR", "Farobiy chorrahasi", 41.3550, 69.2200),
-    LocationSeed("OLMAZOR", "Olmazor — Kichik halqa yo‘li", 41.3410, 69.2280, _H),
-    LocationSeed("UCHTEPA", "Lutfiy — Farhod chorrahasi", 41.2950, 69.1800),
-    LocationSeed("UCHTEPA", "Uchtepa savdo markazi oldi", 41.2880, 69.1720, _S),
-    LocationSeed("YASHNOBOD", "Tuzel chorrahasi", 41.2890, 69.3550),
-    LocationSeed("YASHNOBOD", "Maxtumquli — Aviasozlar chorrahasi", 41.2900, 69.3300),
-    LocationSeed("SERGELI", "Sergeli bozori chorrahasi", 41.2270, 69.2190),
-    LocationSeed("SERGELI", "Yangi Sergeli yo‘li", 41.2180, 69.2350, _H),
-    LocationSeed("BEKTEMIR", "Bektemir — Katta halqa yo‘li", 41.2090, 69.3340, _H),
-    LocationSeed("BEKTEMIR", "Husayn Boyqaro ko‘chasi", 41.2200, 69.3200, _S),
-    LocationSeed("YANGIHAYOT", "Yangihayot sanoat zonasi chorrahasi", 41.2050, 69.1900),
-    LocationSeed("YANGIHAYOT", "Chuqursoy chorrahasi", 41.2350, 69.1700),
+    _loc("YUNUSOBOD", "Amir Temur — Shahrisabz chorrahasi", (41.316688, 69.280849), (41.316378, 69.280779)),
+    _loc("YUNUSOBOD", "Yunusobod bozori chorrahasi", (41.364547, 69.287173), (41.364273, 69.287378)),
+    _loc("YUNUSOBOD", "Bog‘ishamol — Amir Temur chorrahasi", (41.339736, 69.285529), (41.340047, 69.285587)),
+    _loc("MIRZO_ULUGBEK", "Buyuk Ipak yo‘li chorrahasi", (41.326208, 69.329102), (41.326152, 69.328690)),
+    _loc("MIRZO_ULUGBEK", "Mirzo Ulug‘bek — Parkent chorrahasi", (41.314766, 69.328560), (41.314637, 69.328941)),
+    _loc("MIRZO_ULUGBEK", "Qorasuv chorrahasi", (41.342947, 69.365114), (41.343142, 69.364786)),
+    _loc("MIROBOD", "Oybek chorrahasi", (41.298762, 69.273186), (41.298517, 69.273449)),
+    _loc("MIROBOD", "Mirobod — Shota Rustaveli chorrahasi", (41.294966, 69.283241), (41.294765, 69.282918)),
+    _loc("MIROBOD", "Toshkent vokzali oldi", (41.292643, 69.287594), (41.292845, 69.287915), _S),
+    _loc("YAKKASAROY", "Bobur — Shota Rustaveli chorrahasi", (41.285299, 69.253756), (41.285542, 69.254023)),
+    _loc("YAKKASAROY", "Kichik halqa yo‘li — Bobur", (41.278864, 69.249149), (41.278756, 69.248756), _H),
+    _loc("CHILONZOR", "Bunyodkor — Chilonzor chorrahasi", (41.274755, 69.204515), (41.274961, 69.204199)),
+    _loc("CHILONZOR", "Novza chorrahasi", (41.292431, 69.222919), (41.292226, 69.223237)),
+    _loc("CHILONZOR", "Muqimiy — Bunyodkor chorrahasi", (41.291630, 69.223810), (41.291428, 69.224132)),
+    _loc("SHAYXONTOHUR", "Chorsu chorrahasi", (41.322408, 69.236440), (41.322327, 69.236842)),
+    _loc("SHAYXONTOHUR", "Navoiy — Furqat chorrahasi", (41.311451, 69.253278), (41.311468, 69.252860)),
+    _loc("SHAYXONTOHUR", "Paxtakor chorrahasi", (41.315937, 69.270374), (41.315640, 69.270239)),
+    _loc("OLMAZOR", "Beruniy — Qorasaroy chorrahasi", (41.345070, 69.207056), (41.345245, 69.206710)),
+    _loc("OLMAZOR", "Farobiy chorrahasi", (41.355450, 69.219423), (41.355613, 69.219065)),
+    _loc("OLMAZOR", "Olmazor — Kichik halqa yo‘li", (41.340274, 69.228559), (41.340121, 69.228193), _H),
+    _loc("UCHTEPA", "Lutfiy — Farhod chorrahasi", (41.291914, 69.179054), (41.291760, 69.179176)),
+    _loc("UCHTEPA", "Uchtepa savdo markazi oldi", (41.287996, 69.172006), (41.287701, 69.171862), _S),
+    _loc("YASHNOBOD", "Tuzel chorrahasi", (41.290911, 69.357700), (41.290657, 69.357946)),
+    _loc("YASHNOBOD", "Maxtumquli — Aviasozlar chorrahasi", (41.293754, 69.336258), (41.293515, 69.336508)),
+    _loc("SERGELI", "Sergeli bozori chorrahasi", (41.226962, 69.219665), (41.227247, 69.219487)),
+    _loc("SERGELI", "Yangi Sergeli yo‘li", (41.217378, 69.234140), (41.217101, 69.234340), _H),
+    _loc("BEKTEMIR", "Bektemir — Katta halqa yo‘li", (41.209056, 69.333582), (41.209369, 69.333624), _H),
+    _loc("BEKTEMIR", "Husayn Boyqaro ko‘chasi", (41.223988, 69.319943), (41.224204, 69.320227), _S),
+    _loc("YANGIHAYOT", "Yangihayot sanoat zonasi chorrahasi", (41.206494, 69.191925), (41.206236, 69.192164)),
+    _loc("YANGIHAYOT", "Chuqursoy chorrahasi", (41.235872, 69.164736), (41.236092, 69.165034)),
 )
+# fmt: on
 
 CAMERA_COUNT = 45
 
