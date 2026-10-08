@@ -4,7 +4,7 @@
   "installCommand": "npm ci --prefix frontend",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "frontend/dist",
-  "regions": ["fra1"],
+  "regions": ["cle1"],
   "functions": {
     "api/index.py": {
       "maxDuration": 30,
