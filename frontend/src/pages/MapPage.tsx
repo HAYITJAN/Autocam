@@ -12,7 +12,7 @@ import type { CameraStatus } from "@/lib/types";
 
 type Layer = "cameras" | "heatmap" | "districts";
 
-const DISTRICT_BAR_COLORS = ["#f43f5e", "#f97316", "#f59e0b", "#625fee", "#716ef1", "#8a87f4", "#aeacf8", "#cfcefb"];
+const DISTRICT_BAR_COLORS = ["#121212", "#2c2c2b", "#474745", "#62625f", "#7f7f7b", "#9d9d99", "#bcbcb8", "#d8d8d4"];
 
 function SelectedCamera({ id, onClose }: { id: number; onClose: () => void }) {
   const camera = useCamera(id);
@@ -26,20 +26,20 @@ function SelectedCamera({ id, onClose }: { id: number; onClose: () => void }) {
               <div className="rounded-xl bg-red-50 p-2">
                 <ShieldAlert className="mx-auto h-4 w-4 text-red-600" />
                 <div className="mt-1 text-sm font-bold">{cam.violations_today}</div>
-                <div className="text-slate-500">Bugun</div>
+                <div className="text-mute">Bugun</div>
               </div>
               <div className="rounded-xl bg-emerald-50 p-2">
                 <Gauge className="mx-auto h-4 w-4 text-emerald-600" />
                 <div className="mt-1 text-sm font-bold">{cam.metrics.fps?.toFixed(0) ?? "—"}</div>
-                <div className="text-slate-500">FPS</div>
+                <div className="text-mute">FPS</div>
               </div>
               <div className="rounded-xl bg-brand-50 p-2">
                 <Timer className="mx-auto h-4 w-4 text-brand-600" />
                 <div className="mt-1 text-sm font-bold">{cam.metrics.latency_ms ?? "—"}</div>
-                <div className="text-slate-500">ms</div>
+                <div className="text-mute">ms</div>
               </div>
             </div>
-            <dl className="divide-y divide-slate-100">
+            <dl className="divide-y divide-line">
               <Field label="Manzil">{cam.location.name}</Field>
               <Field label="Hudud">{cam.location.district.name}</Field>
               <Field label="Kamera turi">{cam.camera_type}</Field>
@@ -93,7 +93,7 @@ export default function MapPage() {
       <PageHeader
         title={t("nav.map")}
         subtitle="Kameralar joylashuvi, qoidabuzarliklar va real vaqt holatini xaritada kuzating"
-        actions={
+        stats={
           <>
             <KpiTile icon={Camera} tone="blue" label="Jami kameralar" value={s?.total ?? "—"} />
             <KpiTile icon={CheckCircle2} tone="green" label="Online" value={s?.online ?? "—"} hint={s ? formatPct((s.online / Math.max(s.total, 1)) * 100) : undefined} />
@@ -112,20 +112,20 @@ export default function MapPage() {
 
       <div className={cn("grid gap-5", selected !== null && "xl:grid-cols-[1fr_360px]")}>
         <div className="card relative p-2">
-          <div className="absolute left-5 top-5 z-10 w-56 space-y-3 rounded-xl border border-slate-200 bg-white/95 p-3 text-sm shadow-lg backdrop-blur">
+          <div className="absolute left-5 top-5 z-10 w-56 space-y-3 rounded-xl border border-line bg-white/95 p-3 text-sm shadow-lg backdrop-blur">
             <ul className="space-y-1.5">
-              <li className="font-semibold text-slate-800">Barcha kameralar ({s?.total ?? "—"})</li>
+              <li className="font-semibold text-ink">Barcha kameralar ({s?.total ?? "—"})</li>
               {statusCounts.map(([status, count]) => (
-                <li key={status} className="flex items-center justify-between text-slate-600">
+                <li key={status} className="flex items-center justify-between text-ink/70">
                   <span className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] }} />
                     {t(`camera.status.${status}`)}
                   </span>
-                  <span className="text-xs text-slate-500">{count ?? "—"}</span>
+                  <span className="text-xs text-mute">{count ?? "—"}</span>
                 </li>
               ))}
             </ul>
-            <div className="space-y-1.5 border-t border-slate-100 pt-2">
+            <div className="space-y-1.5 border-t border-line pt-2">
               {(
                 [
                   ["cameras", t("map.cameras")],
@@ -133,7 +133,7 @@ export default function MapPage() {
                   ["districts", t("map.districts")],
                 ] as [Layer, string][]
               ).map(([layer, label]) => (
-                <label key={layer} className="flex cursor-pointer items-center gap-2 text-slate-700">
+                <label key={layer} className="flex cursor-pointer items-center gap-2 text-ink/80">
                   <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={layers.has(layer)} onChange={() => toggle(layer)} />
                   {label}
                 </label>
@@ -146,10 +146,10 @@ export default function MapPage() {
             </select>
           </div>
           {layers.has("heatmap") && (
-            <div className="absolute bottom-5 right-5 z-10 w-48 rounded-xl border border-slate-200 bg-white/95 p-2.5 text-xs shadow-lg">
-              <div className="mb-1 font-semibold text-slate-700">Qoidabuzarliklar zichligi</div>
+            <div className="absolute bottom-5 right-5 z-10 w-48 rounded-xl border border-line bg-white/95 p-2.5 text-xs shadow-lg">
+              <div className="mb-1 font-semibold text-ink/80">Qoidabuzarliklar zichligi</div>
               <div className="h-2 rounded-full bg-gradient-to-r from-emerald-300 via-amber-300 to-red-500" />
-              <div className="mt-1 flex justify-between text-slate-500">
+              <div className="mt-1 flex justify-between text-mute">
                 <span>Kam</span>
                 <span>Yuqori</span>
               </div>
@@ -177,15 +177,15 @@ export default function MapPage() {
                 key={camera.id}
                 type="button"
                 onClick={() => setSelected(camera.id)}
-                className={cn("overflow-hidden rounded-xl border text-left transition hover:shadow-md", selected === camera.id ? "border-brand-500" : "border-slate-200")}
+                className={cn("overflow-hidden rounded-xl border text-left transition hover:shadow-md", selected === camera.id ? "border-brand-500" : "border-line")}
               >
                 <CameraPreview seed={camera.id} status={camera.status} />
                 <div className="p-2.5 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-900">{camera.code}</span>
+                    <span className="text-sm font-bold text-ink">{camera.code}</span>
                     <CameraStatusBadge status={camera.status} />
                   </div>
-                  <div className="truncate text-slate-500">{camera.location_name}</div>
+                  <div className="truncate text-mute">{camera.location_name}</div>
                   <div className="mt-1 flex items-center gap-1 font-semibold text-red-600">
                     <ShieldAlert className="h-3.5 w-3.5" /> {camera.violations_today}
                   </div>
@@ -199,17 +199,17 @@ export default function MapPage() {
           <ul className="space-y-2.5 p-5">
             {sortedDistricts.map((district, index) => (
               <li key={district.id} className="grid grid-cols-[130px_1fr_48px] items-center gap-3 text-sm">
-                <span className="truncate text-slate-700">{district.name.replace(" tumani", "")}</span>
-                <div className="h-2 rounded-full bg-slate-100">
+                <span className="truncate text-ink/80">{district.name.replace(" tumani", "")}</span>
+                <div className="h-2 rounded-full bg-soft">
                   <div
                     className="h-2 rounded-full"
                     style={{
                       width: `${(district.violations / maxDistrict) * 100}%`,
-                      backgroundColor: DISTRICT_BAR_COLORS[index] ?? "#cbd5e1",
+                      backgroundColor: DISTRICT_BAR_COLORS[index] ?? "#ececea",
                     }}
                   />
                 </div>
-                <span className="text-right font-semibold text-slate-800">{formatNumber(district.violations)}</span>
+                <span className="text-right font-semibold text-ink">{formatNumber(district.violations)}</span>
               </li>
             ))}
           </ul>

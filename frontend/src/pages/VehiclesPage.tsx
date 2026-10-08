@@ -40,13 +40,13 @@ function StatusForm({ vehicle }: { vehicle: VehicleDetail }) {
   const [reason, setReason] = useState(vehicle.status_reason ?? "");
   return (
     <form
-      className="space-y-2 rounded-xl border border-slate-100 p-3"
+      className="space-y-2 rounded-xl border border-line p-3"
       onSubmit={(event) => {
         event.preventDefault();
         mutation.mutate({ status, reason: reason.trim() || undefined });
       }}
     >
-      <div className="text-sm font-semibold text-slate-700">{t("vehicle.changeStatus")}</div>
+      <div className="text-sm font-semibold text-ink/80">{t("vehicle.changeStatus")}</div>
       <div className="flex gap-2">
         <select className="input" value={status} onChange={(event) => setStatus(event.target.value as VehicleStatus)}>
           {STATUSES.map((value) => (
@@ -80,7 +80,7 @@ function VehiclePanel({ id, onClose }: { id: number; onClose: () => void }) {
                 <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-white">{v.last_camera.code}</span>
               )}
             </CameraPreview>
-            <dl className="divide-y divide-slate-100">
+            <dl className="divide-y divide-line">
               <Field label={t("vehicle.type")}>{v.vehicle_type?.name_uz ?? "—"}</Field>
               <Field label={t("vehicle.brandModel")}>{[v.brand, v.model].filter(Boolean).join(" ") || "—"}</Field>
               <Field label={t("vehicle.color")}>{v.color ?? "—"}</Field>
@@ -94,14 +94,14 @@ function VehiclePanel({ id, onClose }: { id: number; onClose: () => void }) {
               </Field>
               <Field label="So‘nggi ko‘rish">
                 {formatDateTime(v.last_seen_at)}
-                {v.last_camera && <div className="text-xs font-normal text-slate-500">{v.last_camera.name}</div>}
+                {v.last_camera && <div className="text-xs font-normal text-mute">{v.last_camera.name}</div>}
               </Field>
             </dl>
             {v.violations_by_type.length > 0 && <DonutChart items={v.violations_by_type} total={v.total_violations} height={150} />}
             {canEdit && <StatusForm key={v.status} vehicle={v} />}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-800">So‘nggi qoidabuzarliklar</span>
+                <span className="text-sm font-bold text-ink">So‘nggi qoidabuzarliklar</span>
                 <Link to={`/vehicles/${v.id}`} className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
                   Barchasi <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
@@ -111,10 +111,10 @@ function VehiclePanel({ id, onClose }: { id: number; onClose: () => void }) {
                   <ul className="space-y-1">
                     {data.items.slice(0, 5).map((item) => (
                       <li key={item.id}>
-                        <Link to={`/violations/${item.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs hover:bg-slate-50">
+                        <Link to={`/violations/${item.id}`} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs hover:bg-soft">
                           <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.type.color }} />
-                          <span className="min-w-0 flex-1 truncate text-slate-700">{item.type.name_uz}</span>
-                          <span className="text-slate-500">{formatDateTime(item.occurred_at)}</span>
+                          <span className="min-w-0 flex-1 truncate text-ink/80">{item.type.name_uz}</span>
+                          <span className="text-mute">{formatDateTime(item.occurred_at)}</span>
                         </Link>
                       </li>
                     ))}
@@ -141,7 +141,7 @@ function BottomCharts() {
           <CardHeader title="Qoidabuzarliklar bo‘yicha top 10 avtomobil" subtitle="So‘nggi 30 kun" />
           <div className="p-4">
             <QueryView query={top} isEmpty={(items) => items.length === 0}>
-              {(items) => <HorizontalBars items={items.map((item) => ({ label: item.label, count: item.count, color: "#ef4444" }))} />}
+              {(items) => <HorizontalBars items={items.map((item) => ({ label: item.label, count: item.count}))} />}
             </QueryView>
           </div>
         </Card>
@@ -193,7 +193,7 @@ export default function VehiclesPage() {
       <PageHeader
         title={t("nav.vehicles")}
         subtitle="Yo‘l harakatida aniqlangan avtomobillar ro‘yxati va ma’lumotlari"
-        actions={
+        stats={
           <>
             <KpiTile icon={Car} tone="blue" label="Jami avtomobillar" value={formatNumber(s?.total)} />
             <KpiTile icon={Activity} tone="amber" label="24 soatda faol" value={formatNumber(s?.active_24h)} />
@@ -206,7 +206,7 @@ export default function VehiclesPage() {
         <CountTabs items={tabs} value={tab} onChange={reset(setTab)} />
         <div className="flex-1" />
         <div className="relative w-60">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-mute" />
           <input className="input pl-9" placeholder="Davlat raqami, marka…" value={search} onChange={(event) => reset(setSearch)(event.target.value)} />
         </div>
         <select className="input w-44" value={vehicleType} onChange={(event) => reset(setVehicleType)(event.target.value)}>
@@ -231,8 +231,8 @@ export default function VehiclesPage() {
             {(data) => (
               <>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-100">
-                    <thead className="bg-slate-50/80">
+                  <table className="min-w-full divide-y divide-line">
+                    <thead className="bg-soft/80">
                       <tr>
                         <th className="th">#</th>
                         <th className="th">{t("vehicle.plate")}</th>
@@ -245,18 +245,18 @@ export default function VehiclesPage() {
                         <th className="th text-right">Amallar</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-line">
                       {data.items.map((vehicle, index) => (
                         <tr
                           key={vehicle.id}
                           onClick={() => setSelected(vehicle.id)}
-                          className={cn("cursor-pointer transition hover:bg-slate-50", selected === vehicle.id && "bg-brand-50/60")}
+                          className={cn("cursor-pointer transition hover:bg-soft", selected === vehicle.id && "bg-brand-50/60")}
                         >
-                          <td className="td text-xs text-slate-400">{(data.meta.page - 1) * data.meta.page_size + index + 1}</td>
+                          <td className="td text-xs text-mute">{(data.meta.page - 1) * data.meta.page_size + index + 1}</td>
                           <td className="td">
                             <div className="flex items-center gap-2.5">
                               <CameraPreview seed={vehicle.id * 13} status="ONLINE" className="w-14 shrink-0 rounded-md" />
-                              <span className="whitespace-nowrap font-mono text-sm font-bold text-slate-900">{vehicle.plate_display}</span>
+                              <span className="whitespace-nowrap font-mono text-sm font-bold text-ink">{vehicle.plate_display}</span>
                             </div>
                           </td>
                           <td className="td">
@@ -271,11 +271,11 @@ export default function VehiclesPage() {
                           </td>
                           <td className="td">{[vehicle.brand, vehicle.model].filter(Boolean).join(" ") || "—"}</td>
                           <td className="td text-xs">
-                            <div className="text-slate-700">{formatRelative(vehicle.last_seen_at)}</div>
-                            <div className="text-slate-500">{vehicle.last_camera?.name ?? "—"}</div>
+                            <div className="text-ink/80">{formatRelative(vehicle.last_seen_at)}</div>
+                            <div className="text-mute">{vehicle.last_camera?.name ?? "—"}</div>
                           </td>
                           <td className="td text-right">{formatNumber(vehicle.total_detections)}</td>
-                          <td className={cn("td text-right font-bold", vehicle.total_violations > 0 ? "text-red-600" : "text-slate-400")}>
+                          <td className={cn("td text-right font-bold", vehicle.total_violations > 0 ? "text-red-600" : "text-mute")}>
                             {formatNumber(vehicle.total_violations)}
                           </td>
                           <td className="td">

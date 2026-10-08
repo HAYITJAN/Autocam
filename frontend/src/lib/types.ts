@@ -270,7 +270,7 @@ export interface ViolationDetail extends ViolationListItem {
   vehicle: VehicleBrief | null;
   evidence: EvidenceOut[];
   events: ViolationEventOut[];
-  allowed_actions: ViolationAction[];
+  allowed_actions: string[];
   meta: Record<string, unknown>;
 }
 

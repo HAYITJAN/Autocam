@@ -11,8 +11,8 @@ export default function UsersPage() {
         <QueryView query={users} isEmpty={(items) => items.length === 0}>
           {(items) => (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50">
+              <table className="min-w-full divide-y divide-line">
+                <thead className="bg-soft">
                   <tr>
                     <th className="th">{t("users.fullName")}</th>
                     <th className="th">{t("users.username")}</th>
@@ -21,9 +21,9 @@ export default function UsersPage() {
                     <th className="th">{t("violation.status")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {items.map((user) => (
-                    <tr key={user.id} className="hover:bg-slate-50">
+                    <tr key={user.id} className="hover:bg-soft">
                       <td className="td font-medium">{user.full_name}</td>
                       <td className="td font-mono text-xs">{user.username}</td>
                       <td className="td">{user.email}</td>

@@ -1,4 +1,19 @@
-import { ArrowRight, Camera, Car, CheckCircle2, Clock3, Gauge, Info, ShieldAlert, TriangleAlert, type LucideIcon } from "lucide-react";
+import {
+  BarChart3,
+  Bot,
+  Calendar,
+  Camera,
+  Car,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock3,
+  Gauge,
+  Map as MapIcon,
+  MonitorPlay,
+  ShieldAlert,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -7,201 +22,259 @@ import {
   useKpis,
   useMapCameras,
   useRecentViolations,
+  useSystemStatus,
   useViolationsTimeseries,
   useViolationTypeDistribution,
 } from "@/api/queries";
 import { CameraMap, MapLegend } from "@/components/CameraMap";
 import { CameraPreview } from "@/components/CameraPreview";
-import { DonutChart, Sparkline, TimeseriesChart } from "@/components/charts";
+import { HatchedColumns, TrendArea, VolumeBars } from "@/components/charts";
 import {
+  ArrowLink,
   Card,
   CardHeader,
   CameraStatusBadge,
+  DeltaChip,
+  Figure,
   IconBadge,
+  PageHeader,
   QueryView,
   RangeTabs,
-  ViolationStatusBadge,
   type IconTone,
 } from "@/components/ui";
-import { cn, formatNumber, formatPct, formatTime } from "@/lib/format";
+import { cn, DISPLAY_TZ, formatBucket, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
-import type { CameraListItem, Kpi, TimeRange } from "@/lib/types";
+import type { CameraListItem, DashboardKpis, TimeRange } from "@/lib/types";
+import { useAuthStore, useHasPermission } from "@/stores/auth";
 
-function Skyline() {
-  const towers = [
-    [0, 40], [18, 58], [34, 30], [50, 72], [64, 46], [80, 90], [96, 54], [110, 66], [126, 38], [140, 104],
-    [152, 62], [168, 48], [182, 80], [198, 56], [214, 34], [228, 70], [244, 44], [258, 60], [274, 36], [290, 52],
-  ] as const;
-  return (
-    <svg viewBox="0 0 310 110" className="absolute bottom-0 right-6 h-full w-[50%] opacity-60" preserveAspectRatio="xMaxYMax meet" aria-hidden>
-      <defs>
-        <linearGradient id="tower" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8a87f4" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#8a87f4" stopOpacity="0.05" />
-        </linearGradient>
-      </defs>
-      {towers.map(([x, h]) => (
-        <rect key={x} x={x} y={110 - h} width={14} height={h} rx={2} fill="url(#tower)" />
-      ))}
-      <rect x="143" y="2" width="2" height="6" fill="#8a87f4" opacity="0.6" />
-    </svg>
+const MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+const WEEKDAY_SHORT = ["Yak", "Dush", "Sesh", "Chor", "Pay", "Jum", "Shan"];
+
+function todayLabel(): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: DISPLAY_TZ, day: "numeric", month: "numeric", year: "numeric" })
+      .formatToParts(new Date())
+      .map((part) => [part.type, part.value]),
   );
+  return `${parts.day} ${MONTHS[Number(parts.month) - 1] ?? ""}, ${parts.year}`;
 }
 
-function Hero() {
+function shortLabel(text: string, max = 14): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+// ------------------------------------------------------------ today card
+
+function QuickAction({ to, icon: Icon, label }: { to: string; icon: LucideIcon; label: string }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-[#2d2a7a] px-7 py-7 shadow-lift">
-      <div className="pointer-events-none absolute -left-16 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
-      <Skyline />
-      <div className="relative max-w-xl">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/80">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Toshkent shahri · real vaqt
-        </span>
-        <h1 className="mt-3 text-[26px] font-bold leading-tight tracking-tight text-white">Yo‘l harakati nazorati tizimi</h1>
-        <p className="mt-1.5 text-[13px] text-white/60">
-          Sun’iy intellekt yordamida avtomatlashtirilgan qoidabuzarliklarni aniqlash va monitoring qilish
-        </p>
-      </div>
-    </div>
-  );
-}
-
-const TONE_HEX: Record<IconTone, string> = {
-  blue: "#625fee",
-  green: "#10b981",
-  red: "#f43f5e",
-  amber: "#f59e0b",
-  violet: "#8b5cf6",
-  sky: "#0ea5e9",
-  pink: "#ec4899",
-  slate: "#94a3b8",
-};
-
-interface KpiCardProps {
-  label: string;
-  kpi: Kpi;
-  icon: LucideIcon;
-  tone: IconTone;
-  format?: (value: number) => string;
-  extra?: ReactNode;
-  deltaPositiveIsGood?: boolean;
-}
-
-function KpiCard({ label, kpi, icon, tone, format = formatNumber, extra, deltaPositiveIsGood = true }: KpiCardProps) {
-  const delta = kpi.delta_pct;
-  const good = delta === null ? null : (delta >= 0) === deltaPositiveIsGood;
-  return (
-    <div className="card relative flex flex-col p-4">
-      <span className="absolute right-3 top-3 text-slate-300" title={label}>
-        <Info className="h-4 w-4" />
+    <Link to={to} className="group flex flex-col items-center gap-1.5" title={label}>
+      <span className="flex h-11 w-full items-center justify-center rounded-full bg-soft text-ink transition group-hover:bg-ink group-hover:text-white">
+        <Icon className="h-[18px] w-[18px]" />
       </span>
-      <div className="flex items-center gap-3 pr-5">
-        <IconBadge icon={icon} tone={tone} />
-        <p className="truncate text-[22px] font-bold leading-tight tracking-tight text-navy-900">{format(kpi.value)}</p>
-      </div>
-      <p className="mt-2.5 truncate text-[13px] text-slate-500">{label}</p>
-      <div className="mt-1 flex items-end justify-between gap-2">
-        <div className="text-[11px]">
-          {extra ??
-            (delta !== null && (
-              <span className={cn("rounded-md px-1.5 py-0.5 font-semibold", good ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600")}>
-                {delta >= 0 ? "↑" : "↓"} {formatPct(Math.abs(delta))}
-              </span>
-            ))}
-        </div>
-        <div className="w-20">
-          <Sparkline values={kpi.sparkline} color={TONE_HEX[tone]} />
-        </div>
-      </div>
-    </div>
+      <span className="text-[11px] text-mute group-hover:text-ink">{label}</span>
+    </Link>
   );
 }
 
-function KpiGrid() {
-  const query = useKpis();
+function BreakdownRow({ icon, tone, title, subtitle, value, note }: { icon: LucideIcon; tone: IconTone; title: string; subtitle: string; value: ReactNode; note?: ReactNode }) {
   return (
-    <QueryView query={query}>
-      {(kpis) => {
-        const onlinePct = (kpis.active_cameras.value / Math.max(kpis.total_cameras, 1)) * 100;
-        return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-            <KpiCard label={t("kpi.totalVehicles")} kpi={kpis.total_vehicles} icon={Car} tone="green" />
-            <KpiCard
-              label={t("kpi.activeCameras")}
-              kpi={kpis.active_cameras}
-              icon={Camera}
-              tone="blue"
-              format={(value) => `${formatNumber(value)} / ${kpis.total_cameras}`}
-              extra={
-                <div className="w-24">
-                  <div className="h-1.5 rounded-full bg-slate-100">
-                    <div className="h-1.5 rounded-full bg-brand-600" style={{ width: `${onlinePct}%` }} />
-                  </div>
-                  <span className="mt-1 block font-semibold text-brand-600">{formatPct(onlinePct, 0)} online</span>
-                </div>
-              }
-            />
-            <KpiCard
-              label={t("kpi.violationsToday")}
-              kpi={kpis.violations_today}
-              icon={TriangleAlert}
-              tone="red"
-              deltaPositiveIsGood={false}
-            />
-            <KpiCard
-              label={t("kpi.confirmedToday")}
-              kpi={kpis.confirmed_today}
-              icon={CheckCircle2}
-              tone="violet"
-              extra={
-                kpis.confirmed_today.secondary !== null && (
-                  <span className="font-semibold text-emerald-600">{formatPct(kpis.confirmed_today.secondary)}</span>
-                )
-              }
-            />
-            <KpiCard
-              label={t("kpi.pendingToday")}
-              kpi={kpis.pending_today}
-              icon={Clock3}
-              tone="amber"
-              extra={
-                kpis.pending_today.secondary !== null && (
-                  <span className="font-semibold text-amber-600">{formatPct(kpis.pending_today.secondary)}</span>
-                )
-              }
-            />
-            <KpiCard
-              label={t("kpi.uptime")}
-              kpi={kpis.uptime_pct}
-              icon={Gauge}
-              tone="pink"
-              format={(value) => formatPct(value)}
-              extra={<span className="text-slate-400">7 kun</span>}
-            />
-          </div>
-        );
-      }}
-    </QueryView>
+    <li className="flex items-center gap-3 rounded-2xl bg-soft/70 px-3 py-2.5">
+      <IconBadge icon={icon} tone={tone} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-semibold text-ink">{title}</div>
+        <div className="truncate text-[11px] text-mute">{subtitle}</div>
+      </div>
+      <div className="text-right">
+        <div className="text-[13px] font-semibold text-ink">{value}</div>
+        {note && <div className="text-[11px] text-mute">{note}</div>}
+      </div>
+    </li>
   );
 }
+
+function TodayCard({ kpis }: { kpis: DashboardKpis }) {
+  const status = useSystemStatus();
+  const ai = status.data?.components.find((item) => item.name === "ai_service");
+  const trend = kpis.violations_today.sparkline.map((value, index, all) => ({
+    label: index === all.length - 1 ? "Bugun" : `${all.length - 1 - index} kun oldin`,
+    value,
+  }));
+  const onlinePct = (kpis.active_cameras.value / Math.max(kpis.total_cameras, 1)) * 100;
+
+  return (
+    <Card className="flex flex-col p-5 xl:row-span-2">
+      <div className="flex items-start justify-between">
+        <p className="text-[13px] font-medium text-mute">Bugungi qoidabuzarliklar</p>
+        <ArrowLink to="/violations" />
+      </div>
+      <div className="mt-1 flex items-end gap-3">
+        <span className="text-[44px] font-semibold leading-none tracking-tight text-ink">{formatNumber(kpis.violations_today.value)}</span>
+        <span className="pb-1.5">
+          <DeltaChip value={kpis.violations_today.delta_pct} positiveIsGood={false} />
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-mute">kechagi kun bilan solishtirganda</p>
+
+      <div className="mt-5 grid grid-cols-4 gap-2">
+        <QuickAction to="/violations?status=NEW" icon={ClipboardCheck} label="Ko‘rish" />
+        <QuickAction to="/monitoring" icon={MonitorPlay} label="Jonli" />
+        <QuickAction to="/map" icon={MapIcon} label="Xarita" />
+        <QuickAction to="/analytics" icon={BarChart3} label="Tahlil" />
+      </div>
+
+      <div className="mt-4 -mx-1">
+        <TrendArea data={trend} height={110} />
+      </div>
+
+      <h3 className="mb-2.5 mt-4 text-[13px] font-semibold text-ink">Tizim tarkibi</h3>
+      <ul className="space-y-2">
+        <BreakdownRow
+          icon={Camera}
+          tone="blue"
+          title="Faol kameralar"
+          subtitle={`${formatPct(onlinePct, 0)} onlayn`}
+          value={<Figure value={`${kpis.active_cameras.value} / ${kpis.total_cameras}`} />}
+        />
+        <BreakdownRow icon={CheckCircle2} tone="green" title="Tasdiqlangan" subtitle="bugun" value={formatNumber(kpis.confirmed_today.value)} note={formatPct(kpis.confirmed_today.secondary)} />
+        <BreakdownRow icon={Clock3} tone="amber" title="Ko‘rib chiqilmoqda" subtitle="navbatda" value={formatNumber(kpis.pending_today.value)} note={formatPct(kpis.pending_today.secondary)} />
+        <BreakdownRow icon={Car} tone="slate" title="Avtomobillar" subtitle="bazada jami" value={formatNumber(kpis.total_vehicles.value)} />
+        <BreakdownRow icon={Gauge} tone="violet" title="Ishlash vaqti" subtitle="so‘nggi 7 kun" value={<Figure value={formatPct(kpis.uptime_pct.value)} />} />
+        <BreakdownRow
+          icon={Bot}
+          tone={ai?.state === "up" ? "green" : "red"}
+          title="AI modul"
+          subtitle="aniqlash xizmati"
+          value={ai ? (ai.state === "up" ? "Online" : "Offline") : "—"}
+        />
+      </ul>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- charts
+
+function VolumeCard() {
+  const [range, setRange] = useState<TimeRange>("30d");
+  const query = useViolationsTimeseries(range);
+  const total = query.data?.totals.reduce((sum, value) => sum + value, 0);
+  return (
+    <Card className="flex flex-col">
+      <CardHeader title="Qoidabuzarliklar hajmi" subtitle={range === "24h" ? "So‘nggi 24 soat, soatlar bo‘yicha" : `So‘nggi ${range === "7d" ? 7 : 30} kun`} to="/analytics" />
+      <div className="flex items-center justify-between px-5">
+        <span className="text-[26px] font-semibold tracking-tight text-ink">{formatNumber(total)}</span>
+        <RangeTabs value={range} onChange={setRange} />
+      </div>
+      <div className="flex-1 px-4 pb-4 pt-2">
+        <QueryView query={query}>
+          {(data) => <VolumeBars height={190} data={data.buckets.map((bucket, index) => ({ label: formatBucket(bucket, data.bucket), value: data.totals[index] ?? 0 }))} />}
+        </QueryView>
+      </div>
+    </Card>
+  );
+}
+
+function WeeklyCard() {
+  const query = useViolationsTimeseries("7d");
+  return (
+    <Card className="flex flex-col">
+      <CardHeader title="Haftalik dinamika" subtitle="So‘nggi 7 kun" to="/violations" />
+      <QueryView query={query}>
+        {(data) => {
+          const total = data.totals.reduce((sum, value) => sum + value, 0);
+          const today = data.totals.at(-1) ?? 0;
+          const previous = data.totals.at(-2) ?? 0;
+          const delta = previous ? ((today - previous) / previous) * 100 : null;
+          return (
+            <>
+              <div className="px-5">
+                <span className="text-[34px] font-semibold leading-tight tracking-tight text-ink">{formatNumber(total)}</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <DeltaChip value={delta} positiveIsGood={false} />
+                  <span className="text-xs text-mute">bugun +{formatNumber(today)}</span>
+                </div>
+              </div>
+              <div className="flex-1 px-3 pb-3">
+                <HatchedColumns
+                  height={170}
+                  showAxis={false}
+                  highlight={data.totals.length - 1}
+                  data={data.buckets.map((bucket, index) => ({
+                    label: WEEKDAY_SHORT[new Date(`${bucket.slice(0, 10)}T12:00:00`).getDay()] ?? formatBucket(bucket, data.bucket),
+                    value: data.totals[index] ?? 0,
+                  }))}
+                />
+              </div>
+            </>
+          );
+        }}
+      </QueryView>
+    </Card>
+  );
+}
+
+function PerformanceCard({ kpis }: { kpis: DashboardKpis }) {
+  const [range, setRange] = useState<TimeRange>("30d");
+  const query = useViolationTypeDistribution(range);
+  return (
+    <Card className="xl:col-span-2">
+      <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5">
+        <div>
+          <h2 className="text-[17px] font-semibold tracking-tight text-ink">Qoidabuzarlik turlari</h2>
+          <p className="mt-0.5 text-xs text-mute">AI aniqlagan hodisalar turlar kesimida</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <RangeTabs value={range} onChange={setRange} />
+          <ArrowLink to="/analytics" />
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3 px-5">
+        <div className="flex items-center gap-3">
+          <IconBadge icon={CheckCircle2} tone="green" />
+          <div>
+            <p className="text-xs text-mute">Bugun tasdiqlangan</p>
+            <p className="flex items-center gap-2 text-[26px] font-semibold leading-tight tracking-tight">
+              {formatNumber(kpis.confirmed_today.value)}
+              <DeltaChip value={kpis.confirmed_today.delta_pct} />
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <IconBadge icon={Clock3} tone="blue" />
+          <div>
+            <p className="text-xs text-mute">Ko‘rib chiqish navbatida</p>
+            <p className="flex items-center gap-2 text-[26px] font-semibold leading-tight tracking-tight">
+              {formatNumber(kpis.pending_today.value)}
+              <DeltaChip value={kpis.pending_today.delta_pct} positiveIsGood={false} />
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="px-3 pb-4 pt-2">
+        <QueryView query={query} isEmpty={(data) => data.total === 0}>
+          {(data) => <HatchedColumns height={260} data={data.items.map((item) => ({ label: shortLabel(item.name), value: item.count }))} />}
+        </QueryView>
+      </div>
+    </Card>
+  );
+}
+
+// ------------------------------------------------------------ live & map
 
 function CameraTile({ camera }: { camera: CameraListItem }) {
   return (
-    <Link to={`/cameras/${camera.id}`} className="group overflow-hidden rounded-xl border border-line bg-white transition hover:-translate-y-0.5 hover:shadow-lift">
-      <CameraPreview seed={camera.id} status={camera.status}>
-        <span className="absolute left-2 top-2">
+    <Link to={`/cameras/${camera.id}`} className="group block overflow-hidden rounded-[1.1rem] bg-soft">
+      <CameraPreview seed={camera.id} status={camera.status} className="transition duration-300 group-hover:scale-[1.02]">
+        <span className="absolute left-2.5 top-2.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-ink backdrop-blur">{camera.code}</span>
+        <span className="absolute right-2.5 top-2.5">
           <CameraStatusBadge status={camera.status} />
         </span>
-      </CameraPreview>
-      <div className="space-y-0.5 px-3 py-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-slate-900">{camera.code}</span>
-          <span className="flex items-center gap-1 text-xs text-slate-500">
-            <ShieldAlert className="h-3.5 w-3.5 text-red-500" /> {camera.violations_today}
+        <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 text-[11px] text-white">
+          <span className="truncate">{camera.location.name}</span>
+          <span className="flex shrink-0 items-center gap-1 font-semibold">
+            <ShieldAlert className="h-3.5 w-3.5" /> {camera.violations_today}
           </span>
-        </div>
-        <p className="truncate text-xs text-slate-500">{camera.location.name}</p>
-      </div>
+        </span>
+      </CameraPreview>
     </Link>
   );
 }
@@ -209,19 +282,12 @@ function CameraTile({ camera }: { camera: CameraListItem }) {
 function LiveCameras() {
   const query = useCameras({ sort: "-violations_today", page_size: 4 });
   return (
-    <Card>
-      <CardHeader
-        title={t("dashboard.liveCameras")}
-        action={
-          <Link to="/monitoring" className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
-            {t("common.viewAll")} <ArrowRight className="h-4 w-4" />
-          </Link>
-        }
-      />
-      <div className="p-4">
+    <Card className="xl:col-span-2">
+      <CardHeader title={t("dashboard.liveCameras")} subtitle="Eng faol 4 ta kamera" to="/monitoring" />
+      <div className="p-4 pt-2">
         <QueryView query={query}>
           {(page) => (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {page.items.map((camera) => (
                 <CameraTile key={camera.id} camera={camera} />
               ))}
@@ -233,101 +299,98 @@ function LiveCameras() {
   );
 }
 
-function MapCard() {
-  const query = useMapCameras();
+function RecentViolations() {
+  const query = useRecentViolations(6);
   return (
-    <Card>
-      <CardHeader title={t("dashboard.cameraMap")} action={<MapLegend />} />
-      <div className="p-4">
-        <QueryView query={query}>{(cameras) => <CameraMap cameras={cameras} height={392} />}</QueryView>
-      </div>
-    </Card>
-  );
-}
-
-function ViolationsChart() {
-  const [range, setRange] = useState<TimeRange>("7d");
-  const query = useViolationsTimeseries(range);
-  return (
-    <Card>
-      <CardHeader title={t("dashboard.violationStats")} action={<RangeTabs value={range} onChange={setRange} />} />
-      <div className="p-4">
-        <QueryView query={query}>{(data) => <TimeseriesChart data={data} height={260} />}</QueryView>
-      </div>
-    </Card>
-  );
-}
-
-function TypesCard() {
-  const [range, setRange] = useState<TimeRange>("30d");
-  const query = useViolationTypeDistribution(range);
-  return (
-    <Card>
-      <CardHeader title={t("dashboard.violationTypes")} action={<RangeTabs value={range} onChange={setRange} />} />
-      <div className="p-4">
-        <QueryView query={query} isEmpty={(data) => data.total === 0}>
-          {(data) => <DonutChart items={data.items} total={data.total} />}
+    <Card className="flex flex-col">
+      <CardHeader title={t("dashboard.recentViolations")} subtitle="Real vaqt oqimi" to="/violations" />
+      <div className="flex-1 p-4 pt-2">
+        <QueryView query={query} isEmpty={(items) => items.length === 0}>
+          {(items) => (
+            <ul className="space-y-2">
+              {items.map((item) => (
+                <li key={item.id}>
+                  <Link to={`/violations/${item.id}`} className="flex items-center gap-3 rounded-2xl bg-soft/70 px-3 py-2.5 transition hover:bg-soft">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: item.type.color }}>
+                      <TriangleAlert className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold text-ink">{item.type.name_uz}</div>
+                      <div className="truncate text-[11px] text-mute">
+                        {item.camera.code} · {item.location_name ?? item.district_name ?? "—"}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="font-mono text-[13px] font-bold text-ink">{item.plate_number ?? "—"}</div>
+                      <div className="text-[11px] text-mute">{formatTime(item.occurred_at)}</div>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </QueryView>
       </div>
     </Card>
   );
 }
 
-function RecentViolations() {
-  const query = useRecentViolations(5);
+function MapCard() {
+  const query = useMapCameras();
   return (
-    <Card>
-      <CardHeader
-        title={t("dashboard.recentViolations")}
-        action={
-          <Link to="/violations" className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:underline">
-            Barchasi <ArrowRight className="h-4 w-4" />
-          </Link>
-        }
-      />
-      <QueryView query={query} isEmpty={(items) => items.length === 0}>
-        {(items) => (
-          <ul className="divide-y divide-slate-100">
-            {items.map((item) => (
-              <li key={item.id}>
-                <Link to={`/violations/${item.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
-                  <CameraPreview seed={item.camera.id * 7 + item.id} status="ONLINE" className="w-16 shrink-0 rounded-md" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-sm font-bold text-slate-900">{item.plate_number ?? "—"}</div>
-                    <div className="text-xs text-slate-500">{item.camera.code}</div>
-                  </div>
-                  <div className="hidden min-w-0 flex-1 sm:block">
-                    <div className="flex items-center gap-1.5 truncate text-xs text-slate-700">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.type.color }} />
-                      {item.type.name_uz}
-                    </div>
-                    <div className="text-xs text-slate-400">{formatTime(item.occurred_at)}</div>
-                  </div>
-                  <ViolationStatusBadge status={item.status} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </QueryView>
+    <Card className="xl:col-span-3">
+      <CardHeader title={t("dashboard.cameraMap")} subtitle="Toshkent shahri bo‘ylab kameralar holati" action={<MapLegend />} to="/map" />
+      <div className="p-4 pt-2">
+        <QueryView query={query}>{(cameras) => <CameraMap cameras={cameras} height={380} />}</QueryView>
+      </div>
     </Card>
   );
 }
 
+// ------------------------------------------------------------------ page
+
 export default function DashboardPage() {
+  const user = useAuthStore((state) => state.user);
+  const canMonitor = useHasPermission("monitoring.view");
+  const kpis = useKpis();
+  const firstName = user?.full_name.split(/\s+/)[0] ?? "";
+
   return (
-    <div className="space-y-5">
-      <Hero />
-      <KpiGrid />
-      <div className="grid gap-5 xl:grid-cols-2">
-        <LiveCameras />
-        <MapCard />
-      </div>
-      <div className="grid gap-5 xl:grid-cols-3">
-        <ViolationsChart />
-        <TypesCard />
-        <RecentViolations />
-      </div>
-    </div>
+    <>
+      <PageHeader
+        crumbs={[{ label: "Bosh sahifa", to: "/" }, { label: "Boshqaruv paneli" }]}
+        title={`Xush kelibsiz, ${firstName}`}
+        actions={
+          <>
+            <span className="pill pointer-events-none">
+              <Calendar className="h-4 w-4 text-mute" /> {todayLabel()}
+            </span>
+            {canMonitor && (
+              <Link to="/monitoring" className="btn-primary">
+                <MonitorPlay className="h-4 w-4" /> Jonli monitoring
+              </Link>
+            )}
+          </>
+        }
+      />
+
+      <QueryView query={kpis}>
+        {(data) => (
+          <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.95fr)_1.25fr_1fr]">
+              <TodayCard kpis={data} />
+              <VolumeCard />
+              <WeeklyCard />
+              <PerformanceCard kpis={data} />
+            </div>
+            <div className={cn("grid gap-4 xl:grid-cols-3")}>
+              <LiveCameras />
+              <RecentViolations />
+              <MapCard />
+            </div>
+          </div>
+        )}
+      </QueryView>
+    </>
   );
 }

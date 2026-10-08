@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Eye, RotateCcw, Search, TriangleAlert, XCircle } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, CheckCircle2, Clock3, Eye, RotateCcw, Search, TriangleAlert, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -7,10 +7,12 @@ import { CameraPreview } from "@/components/CameraPreview";
 import { Sparkline } from "@/components/charts";
 import { ViolationActions } from "@/components/ViolationActions";
 import {
+  CountTabs,
   Field,
   KpiTile,
   Pagination,
   PageHeader,
+  PageSizeSelect,
   PlateNumber,
   QueryView,
   SidePanel,
@@ -20,12 +22,12 @@ import { cn, formatConfidence, formatDateTime, formatNumber, formatPct, toIsoEnd
 import { t } from "@/lib/i18n";
 import type { ViolationStatus } from "@/lib/types";
 
-const STATUSES: ViolationStatus[] = ["NEW", "UNDER_REVIEW", "CONFIRMED", "REJECTED", "ARCHIVED"];
+type StatusTab = ViolationStatus | "";
 
 function confidenceTone(value: number): string {
-  if (value >= 0.9) return "text-emerald-600";
+  if (value >= 0.9) return "text-accent-700";
   if (value >= 0.75) return "text-amber-600";
-  return "text-red-600";
+  return "text-rose-600";
 }
 
 function ViolationPanel({ id, onClose }: { id: number; onClose: () => void }) {
@@ -41,8 +43,8 @@ function ViolationPanel({ id, onClose }: { id: number; onClose: () => void }) {
                 {formatDateTime(v.occurred_at)}
               </span>
             </CameraPreview>
-            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{t("violation.noEvidence")}</p>
-            <dl className="divide-y divide-slate-100">
+            <p className="rounded-2xl bg-soft px-3 py-2 text-xs text-mute">{t("violation.noEvidence")}</p>
+            <dl className="divide-y divide-line">
               <Field label={t("violation.plate")}>
                 <PlateNumber value={v.plate_number} />
               </Field>
@@ -121,51 +123,85 @@ export default function ViolationsPage() {
         title={t("nav.violations")}
         subtitle="Aniqlangan yo‘l harakati qoidabuzarliklari ro‘yxati va dalillari"
         actions={
+          <Link to="/analytics" className="btn-secondary">
+            <BarChart3 className="h-4 w-4" /> Tahlil
+          </Link>
+        }
+        stats={
           <>
             <KpiTile
               icon={TriangleAlert}
               tone="red"
               label="Jami qoidabuzarliklar"
               value={formatNumber(s?.total)}
+              delta={s?.today_delta_pct}
+              deltaPositiveIsGood={false}
               hint={s ? `bugun ${formatNumber(s.today)}` : undefined}
-              spark={kpis.data && <Sparkline values={kpis.data.violations_today.sparkline} color="#ef4444" />}
+              spark={kpis.data && <Sparkline values={kpis.data.violations_today.sparkline} />}
             />
             <KpiTile
               icon={CheckCircle2}
               tone="green"
               label="Tasdiqlangan"
               value={formatNumber(s?.confirmed)}
-              hint={s ? formatPct((s.confirmed / total) * 100) : undefined}
-              spark={kpis.data && <Sparkline values={kpis.data.confirmed_today.sparkline} color="#22c55e" />}
+              hint={s ? `${formatPct((s.confirmed / total) * 100)} jamidan` : undefined}
+              spark={kpis.data && <Sparkline values={kpis.data.confirmed_today.sparkline} />}
             />
             <KpiTile
               icon={Clock3}
-              tone="blue"
-              label="Ko‘rib chiqilmoqda"
+              tone="amber"
+              label="Ko‘rib chiqish kutilmoqda"
               value={formatNumber(s?.pending)}
-              hint={s ? formatPct((s.pending / total) * 100) : undefined}
-              spark={kpis.data && <Sparkline values={kpis.data.pending_today.sparkline} color="#625fee" />}
+              hint={s ? `${formatPct((s.pending / total) * 100)} jamidan` : undefined}
+              spark={kpis.data && <Sparkline values={kpis.data.pending_today.sparkline} color="#f59e0b" />}
             />
-            <KpiTile icon={XCircle} tone="slate" label="Rad etilgan" value={formatNumber(s?.rejected)} hint={s ? formatPct((s.rejected / total) * 100) : undefined} />
+            <KpiTile
+              icon={XCircle}
+              tone="slate"
+              label="Rad etilgan"
+              value={formatNumber(s?.rejected)}
+              hint={s ? `${formatPct((s.rejected / total) * 100)} jamidan` : undefined}
+            />
           </>
         }
       />
 
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <CountTabs<StatusTab>
+          items={[
+            { value: "", label: "Barchasi", count: s?.total },
+            { value: "NEW", label: t("violation.status.NEW"), tone: "red" },
+            { value: "UNDER_REVIEW", label: t("violation.status.UNDER_REVIEW"), tone: "amber" },
+            { value: "CONFIRMED", label: t("violation.status.CONFIRMED"), count: s?.confirmed, tone: "green" },
+            { value: "REJECTED", label: t("violation.status.REJECTED"), count: s?.rejected, tone: "blue" },
+            { value: "ARCHIVED", label: t("violation.status.ARCHIVED") },
+          ]}
+          value={(get("status") as StatusTab) || ""}
+          onChange={(value) => update("status", value)}
+        />
+        {hasFilters && (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              setSearch("");
+              setParams(new URLSearchParams(), { replace: true });
+            }}
+          >
+            <RotateCcw className="h-4 w-4" /> Filtrlarni tozalash
+          </button>
+        )}
+      </div>
+
       <div className="card mb-4 flex flex-wrap items-center gap-3 p-3">
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1">
-          <CalendarDays className="h-4 w-4 text-slate-400" />
-          <input type="date" className="bg-transparent text-sm outline-none" value={get("from")} onChange={(event) => update("from", event.target.value)} />
-          <span className="text-slate-400">→</span>
-          <input type="date" className="bg-transparent text-sm outline-none" value={get("to")} onChange={(event) => update("to", event.target.value)} />
-        </div>
         <form
-          className="relative w-56"
+          className="relative min-w-56 flex-1"
           onSubmit={(event) => {
             event.preventDefault();
             update("search", search.trim());
           }}
         >
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-mute" />
           <input
             className="input pl-9"
             placeholder="ID yoki davlat raqami…"
@@ -190,26 +226,12 @@ export default function ViolationsPage() {
             </option>
           ))}
         </select>
-        <select className="input w-44" value={get("status")} onChange={(event) => update("status", event.target.value)}>
-          <option value="">Barcha holat</option>
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {t(`violation.status.${status}`)}
-            </option>
-          ))}
-        </select>
-        {hasFilters && (
-          <button
-            type="button"
-            className="btn-secondary ml-auto"
-            onClick={() => {
-              setSearch("");
-              setParams(new URLSearchParams(), { replace: true });
-            }}
-          >
-            <RotateCcw className="h-4 w-4" /> Tozalash
-          </button>
-        )}
+        <div className="flex h-10 items-center gap-2 rounded-full border border-line bg-white px-4">
+          <CalendarDays className="h-4 w-4 text-mute" />
+          <input type="date" className="bg-transparent text-sm outline-none" value={get("from")} onChange={(event) => update("from", event.target.value)} />
+          <span className="text-mute">→</span>
+          <input type="date" className="bg-transparent text-sm outline-none" value={get("to")} onChange={(event) => update("to", event.target.value)} />
+        </div>
       </div>
 
       <div className={cn("grid gap-5", selected !== null && "xl:grid-cols-[1fr_400px]")}>
@@ -218,14 +240,14 @@ export default function ViolationsPage() {
             {(data) => (
               <>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-100">
-                    <thead className="bg-slate-50/80">
+                  <table className="min-w-full divide-y divide-line">
+                    <thead>
                       <tr>
                         <th className="th">{t("violation.code")}</th>
                         <th className="th">
                           <button
                             type="button"
-                            className="whitespace-nowrap hover:text-slate-600"
+                            className="whitespace-nowrap hover:text-ink"
                             onClick={() => update("sort", get("sort") === "occurred_at" ? "-occurred_at" : "occurred_at")}
                           >
                             Sana va vaqt {get("sort") === "occurred_at" ? "↑" : "↓"}
@@ -240,30 +262,30 @@ export default function ViolationsPage() {
                         <th className="th text-right">Amallar</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-line">
                       {data.items.map((item) => (
                         <tr
                           key={item.id}
                           onClick={() => setSelected(item.id)}
-                          className={cn("cursor-pointer transition hover:bg-slate-50", selected === item.id && "bg-brand-50/60")}
+                          className={cn("cursor-pointer transition hover:bg-soft", selected === item.id && "bg-soft")}
                         >
                           <td className="td">
                             <div className="flex items-center gap-2.5">
                               <CameraPreview seed={item.camera.id * 7 + item.id} status="ONLINE" className="w-14 shrink-0 rounded-md" />
-                              <span className="whitespace-nowrap font-mono text-xs font-bold text-brand-700">{item.code}</span>
+                              <span className="whitespace-nowrap font-mono text-xs font-bold text-ink">{item.code}</span>
                             </div>
                           </td>
                           <td className="td whitespace-nowrap text-xs">
-                            <div className="text-slate-700">{formatDateTime(item.occurred_at).split(",")[0]}</div>
-                            <div className="text-slate-500">{formatDateTime(item.occurred_at).split(",")[1]}</div>
+                            <div className="text-ink">{formatDateTime(item.occurred_at).split(",")[0]}</div>
+                            <div className="text-mute">{formatDateTime(item.occurred_at).split(",")[1]}</div>
                           </td>
                           <td className="td">
-                            <span className="font-mono text-sm font-bold text-slate-900">{item.plate_number ?? "—"}</span>
+                            <span className="font-mono text-sm font-bold text-ink">{item.plate_number ?? "—"}</span>
                           </td>
                           <td className="td">
                             <span className="inline-flex items-center gap-2 text-sm">
                               <span
-                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white"
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
                                 style={{ backgroundColor: item.type.color }}
                               >
                                 <TriangleAlert className="h-3.5 w-3.5" />
@@ -284,7 +306,7 @@ export default function ViolationsPage() {
                               <button
                                 type="button"
                                 title={t("common.view")}
-                                className="rounded-lg p-1.5 text-brand-600 hover:bg-brand-50"
+                                className="icon-btn h-8 w-8"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setSelected(item.id);
@@ -296,7 +318,7 @@ export default function ViolationsPage() {
                                 to={`/violations/${item.id}`}
                                 onClick={(event) => event.stopPropagation()}
                                 title="Batafsil"
-                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                                className="icon-btn h-8 w-8 bg-ink text-white hover:bg-black"
                               >
                                 <ArrowRight className="h-4 w-4" />
                               </Link>
@@ -307,18 +329,11 @@ export default function ViolationsPage() {
                     </tbody>
                   </table>
                 </div>
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <Pagination meta={data.meta} onPage={(page) => update("page", String(page))} />
-                  </div>
-                  <select className="input mr-4 w-28 border-slate-200 py-1 text-xs" value={pageSize} onChange={(event) => update("size", event.target.value)}>
-                    {[10, 20, 50].map((size) => (
-                      <option key={size} value={size}>
-                        Sahifada: {size}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Pagination
+                  meta={data.meta}
+                  onPage={(page) => update("page", String(page))}
+                  extra={<PageSizeSelect value={pageSize} onChange={(size) => update("size", String(size))} />}
+                />
               </>
             )}
           </QueryView>

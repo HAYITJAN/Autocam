@@ -3,11 +3,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useViolation, useViolationComment } from "@/api/queries";
-import { ViolationActions } from "@/components/ViolationActions";
+import { CameraPreview } from "@/components/CameraPreview";
+import { ViolationActions, workflowActions } from "@/components/ViolationActions";
 import {
   Card,
   CardHeader,
   Field,
+  PageHeader,
   PlateNumber,
   QueryView,
   SeverityBadge,
@@ -23,7 +25,7 @@ function CommentBox({ id }: { id: number }) {
   const [text, setText] = useState("");
   return (
     <form
-      className="flex gap-2 border-t border-slate-100 p-4"
+      className="flex gap-2 border-t border-line p-4"
       onSubmit={(event) => {
         event.preventDefault();
         if (text.trim()) comment.mutate(text.trim(), { onSuccess: () => setText("") });
@@ -45,26 +47,35 @@ export default function ViolationDetailPage() {
     <QueryView query={query}>
       {(v) => (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link to="/violations" className="btn-secondary px-2.5">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="flex-1">
-              <h1 className="font-mono text-xl font-semibold text-slate-900">{v.code}</h1>
-              <p className="text-sm text-slate-500">{formatDateTime(v.occurred_at)}</p>
-            </div>
-            <ViolationStatusBadge status={v.status} />
-          </div>
+          <PageHeader
+            crumbs={[{ label: "Bosh sahifa", to: "/" }, { label: t("nav.violations"), to: "/violations" }, { label: v.code }]}
+            title={<span className="font-mono">{v.code}</span>}
+            subtitle={`${v.type.name_uz} · ${formatDateTime(v.occurred_at)}`}
+            actions={
+              <>
+                <ViolationStatusBadge status={v.status} />
+                <Link to="/violations" className="btn-secondary">
+                  <ArrowLeft className="h-4 w-4" /> Ro‘yxatga qaytish
+                </Link>
+              </>
+            }
+          />
 
           <div className="grid gap-5 xl:grid-cols-3">
             <div className="space-y-5 xl:col-span-2">
               <Card>
                 <CardHeader title={t("violation.evidence")} />
-                <div className="p-4">
-                  <div className="flex aspect-video flex-col items-center justify-center gap-2 rounded-lg bg-slate-900 text-sm text-slate-400">
-                    <ImageOff className="h-10 w-10 text-slate-600" />
-                    {v.evidence.length > 0 ? `${v.evidence.length} ta fayl` : t("violation.noEvidence")}
-                  </div>
+                <div className="p-4 pt-0">
+                  <CameraPreview seed={v.camera.id * 7 + v.id} status="ONLINE" className="rounded-[1.1rem]">
+                    <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 font-mono text-[11px] text-white">{v.camera.code}</span>
+                    <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 font-mono text-[11px] text-white">
+                      {formatDateTime(v.occurred_at)}
+                    </span>
+                    <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs text-ink">
+                      <ImageOff className="h-3.5 w-3.5" />
+                      {v.evidence.length > 0 ? `${v.evidence.length} ta dalil fayli` : t("violation.noEvidence")}
+                    </span>
+                  </CameraPreview>
                 </div>
               </Card>
 
@@ -75,7 +86,7 @@ export default function ViolationDetailPage() {
                     <li key={event.id} className="flex gap-3">
                       <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500" />
                       <div className="text-sm">
-                        <div className="font-medium text-slate-800">
+                        <div className="font-medium text-ink">
                           {tDynamic("violation.event", event.event_type)}
                           {event.to_status && (
                             <>
@@ -84,10 +95,10 @@ export default function ViolationDetailPage() {
                             </>
                           )}
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-mute">
                           {formatDateTime(event.created_at)} · {event.actor?.full_name ?? "AI tizimi"}
                         </div>
-                        {event.comment && <p className="mt-1 rounded bg-slate-50 px-2 py-1 text-slate-700">{event.comment}</p>}
+                        {event.comment && <p className="mt-1 rounded bg-soft px-2 py-1 text-ink/80">{event.comment}</p>}
                       </div>
                     </li>
                   ))}
@@ -97,7 +108,7 @@ export default function ViolationDetailPage() {
             </div>
 
             <div className="space-y-5">
-              {v.allowed_actions.length > 0 && (
+              {workflowActions(v).length > 0 && (
                 <Card>
                   <CardHeader title="Amallar" />
                   <ViolationActions violation={v} className="p-4" />
@@ -105,7 +116,7 @@ export default function ViolationDetailPage() {
               )}
               <Card>
                 <CardHeader title={t("violation.details")} />
-                <dl className="divide-y divide-slate-100 px-5 pb-3">
+                <dl className="divide-y divide-line px-5 pb-3">
                   <Field label={t("violation.type")}>
                     <TypeChip name={v.type.name_uz} color={v.type.color} />
                   </Field>
@@ -143,7 +154,7 @@ export default function ViolationDetailPage() {
               {v.vehicle && (
                 <Card>
                   <CardHeader title={t("nav.vehicles")} />
-                  <dl className="divide-y divide-slate-100 px-5 pb-3">
+                  <dl className="divide-y divide-line px-5 pb-3">
                     <Field label={t("vehicle.plate")}>
                       <Link to={`/vehicles/${v.vehicle.id}`}>
                         <PlateNumber value={v.vehicle.plate_display} />

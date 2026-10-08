@@ -1,3 +1,4 @@
+import { CalendarDays, Car, CheckCircle2, Target, TriangleAlert, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -14,36 +15,45 @@ import {
   type Period,
 } from "@/api/queries";
 import { ColumnChart, DonutChart, HorizontalBars, TimeseriesChart, WeekHourHeatmap } from "@/components/charts";
-import { Card, CardHeader, CameraStatusBadge, PageHeader, QueryView, StatTile } from "@/components/ui";
-import { daysAgoInput, formatDay, formatNumber, formatPct, toIsoEnd, toIsoStart } from "@/lib/format";
+import { Card, CardHeader, CameraStatusBadge, KpiTile, PageHeader, QueryView } from "@/components/ui";
+import { cn, daysAgoInput, formatDay, formatNumber, formatPct, toIsoEnd, toIsoStart } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { RankedItem, TimeRange } from "@/lib/types";
+
+const PERIODS = [
+  { days: 1, label: t("range.24h") },
+  { days: 7, label: t("range.7d") },
+  { days: 30, label: t("range.30d") },
+  { days: 90, label: "90 kun" },
+];
+
+const INK_TOOLTIP = {
+  contentStyle: { background: "#121212", border: "none", borderRadius: 14, color: "#fff", fontSize: 12 },
+  itemStyle: { color: "#fff" },
+  labelStyle: { color: "rgba(255,255,255,0.6)" },
+  cursor: { fill: "rgba(0,0,0,0.04)" },
+};
 
 function Overview({ period }: { period: Period }) {
   const query = useAnalyticsOverview(period);
   return (
     <QueryView query={query}>
       {(o) => (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-          <StatTile
-            label={t("common.total")}
-            value={
-              <>
-                {formatNumber(o.total)}
-                {o.total_delta_pct !== null && (
-                  <span className={o.total_delta_pct >= 0 ? "ml-2 text-xs text-red-600" : "ml-2 text-xs text-emerald-600"}>
-                    {o.total_delta_pct >= 0 ? "+" : ""}
-                    {formatPct(o.total_delta_pct)}
-                  </span>
-                )}
-              </>
-            }
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+          <KpiTile
+            icon={TriangleAlert}
+            tone="blue"
+            label="Jami qoidabuzarliklar"
+            value={formatNumber(o.total)}
+            delta={o.total_delta_pct}
+            deltaPositiveIsGood={false}
+            hint="oldingi davrga nisbatan"
           />
-          <StatTile label={t("violation.status.CONFIRMED")} value={formatNumber(o.confirmed)} tone="green" />
-          <StatTile label={t("violation.status.REJECTED")} value={formatNumber(o.rejected)} tone="red" />
-          <StatTile label={t("analytics.avgPerDay")} value={o.avg_per_day.toFixed(1)} tone="blue" />
-          <StatTile label={t("analytics.accuracy")} value={formatPct(o.accuracy_pct)} tone="green" />
-          <StatTile label={t("analytics.vehiclesInvolved")} value={formatNumber(o.vehicles_involved)} />
+          <KpiTile icon={CheckCircle2} tone="green" label={t("violation.status.CONFIRMED")} value={formatNumber(o.confirmed)} />
+          <KpiTile icon={XCircle} tone="red" label={t("violation.status.REJECTED")} value={formatNumber(o.rejected)} />
+          <KpiTile icon={CalendarDays} tone="slate" label={t("analytics.avgPerDay")} value={o.avg_per_day.toFixed(1)} />
+          <KpiTile icon={Target} tone="green" label={t("analytics.accuracy")} value={formatPct(o.accuracy_pct)} hint="tasdiqlangan / ko‘rib chiqilgan" />
+          <KpiTile icon={Car} tone="slate" label={t("analytics.vehiclesInvolved")} value={formatNumber(o.vehicles_involved)} />
         </div>
       )}
     </QueryView>
@@ -64,14 +74,14 @@ function TopList({ title, kind, period }: { title: string; kind: "cameras" | "lo
                 <li key={item.id} className="text-sm">
                   <div className="mb-1 flex justify-between gap-2">
                     <span className="truncate">
-                      <span className="mr-2 text-slate-400">{index + 1}.</span>
+                      <span className="mr-2 text-mute">{index + 1}.</span>
                       <span className={kind === "vehicles" ? "font-mono font-semibold" : "font-medium"}>{item.label}</span>
-                      {item.sublabel && <span className="ml-1 text-xs text-slate-500">{item.sublabel}</span>}
+                      {item.sublabel && <span className="ml-1 text-xs text-mute">{item.sublabel}</span>}
                     </span>
                     <span className="font-semibold">{formatNumber(item.count)}</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-slate-100">
-                    <div className="h-1.5 rounded-full bg-brand-500" style={{ width: `${(item.count / max) * 100}%` }} />
+                  <div className="h-1.5 rounded-full bg-soft">
+                    <div className={cn("h-1.5 rounded-full", index === 0 ? "bg-accent-400" : "bg-ink")} style={{ width: `${(item.count / max) * 100}%` }} />
                   </div>
                 </li>
               ))}
@@ -100,13 +110,20 @@ export default function AnalyticsPage() {
     <div className="space-y-5">
       <PageHeader
         title={t("nav.analytics")}
+        subtitle="Qoidabuzarliklar dinamikasi, hududlar, vaqt kesimi va kameralar samaradorligi"
         actions={
-          <select className="input w-36" value={days} onChange={(event) => setDays(Number(event.target.value))}>
-            <option value={1}>{t("range.24h")}</option>
-            <option value={7}>{t("range.7d")}</option>
-            <option value={30}>{t("range.30d")}</option>
-            <option value={90}>90 kun</option>
-          </select>
+          <div className="segmented">
+            {PERIODS.map((item) => (
+              <button
+                key={item.days}
+                type="button"
+                className={cn("segmented-item", days === item.days && "segmented-active")}
+                onClick={() => setDays(item.days)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         }
       />
 
@@ -114,13 +131,13 @@ export default function AnalyticsPage() {
 
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title={t("analytics.byDay")} />
+          <CardHeader title={t("analytics.byDay")} subtitle="Holatlar kesimida kunlik dinamika" />
           <div className="p-4">
             <QueryView query={daily}>{(data) => <TimeseriesChart data={data} stacked />}</QueryView>
           </div>
         </Card>
         <Card>
-          <CardHeader title={t("dashboard.violationTypes")} />
+          <CardHeader title={t("dashboard.violationTypes")} subtitle="Tanlangan davr bo‘yicha ulush" />
           <div className="p-4">
             <QueryView query={byType} isEmpty={(data) => data.total === 0}>
               {(data) => <DonutChart items={data.items} total={data.total} />}
@@ -131,7 +148,7 @@ export default function AnalyticsPage() {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
-          <CardHeader title={t("analytics.byHour")} />
+          <CardHeader title={t("analytics.byHour")} subtitle="Eng yuqori soat ajratib ko‘rsatiladi" />
           <div className="p-4">
             <QueryView query={byHour}>
               {(data) => <ColumnChart data={data.map((bucket) => ({ hour: `${bucket.hour}`, count: bucket.count }))} xKey="hour" yKey="count" />}
@@ -139,7 +156,7 @@ export default function AnalyticsPage() {
           </div>
         </Card>
         <Card>
-          <CardHeader title={t("analytics.heatmap")} />
+          <CardHeader title={t("analytics.heatmap")} subtitle="Hafta kuni × soat — patrul rejalashtirish uchun" />
           <div className="p-4">
             <QueryView query={heat}>{(cells) => <WeekHourHeatmap cells={cells} />}</QueryView>
           </div>
@@ -157,7 +174,7 @@ export default function AnalyticsPage() {
           <CardHeader title={t("analytics.byDistrict")} />
           <div className="p-4">
             <QueryView query={byDistrict} isEmpty={(data) => data.total === 0}>
-              {(data) => <HorizontalBars items={data.items.map((item) => ({ label: item.name, count: item.count, color: "#16a34a" }))} />}
+              {(data) => <HorizontalBars items={data.items.map((item) => ({ label: item.name, count: item.count}))} />}
             </QueryView>
           </div>
         </Card>
@@ -172,23 +189,23 @@ export default function AnalyticsPage() {
                       data={data.days.map((day) => ({ label: formatDay(day.day), confirmed: day.confirmed, rejected: day.rejected }))}
                       margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar dataKey="confirmed" name={t("violation.status.CONFIRMED")} stackId="a" fill="#16a34a" />
-                      <Bar dataKey="rejected" name={t("violation.status.REJECTED")} stackId="a" fill="#ef4444" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ececea" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "#8a8a87" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <Tooltip {...INK_TOOLTIP} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
+                      <Bar dataKey="confirmed" name={t("violation.status.CONFIRMED")} stackId="a" fill="#5ccb3a" />
+                      <Bar dataKey="rejected" name={t("violation.status.REJECTED")} stackId="a" fill="#121212" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                   {data.rejection_reasons.length > 0 && (
                     <div>
-                      <div className="mb-2 text-sm font-medium text-slate-700">{t("analytics.rejectionReasons")}</div>
+                      <div className="mb-2 text-sm font-medium text-ink/80">{t("analytics.rejectionReasons")}</div>
                       <ul className="space-y-1 text-sm">
                         {data.rejection_reasons.map((reason) => (
                           <li key={reason.code} className="flex justify-between">
-                            <span className="text-slate-600">{reason.name}</span>
-                            <span className="text-slate-500">
+                            <span className="text-ink/70">{reason.name}</span>
+                            <span className="text-mute">
                               {reason.count} · {formatPct(reason.pct)}
                             </span>
                           </li>
@@ -208,8 +225,8 @@ export default function AnalyticsPage() {
         <QueryView query={performance} isEmpty={(items) => items.length === 0}>
           {(items) => (
             <div className="max-h-[480px] overflow-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="sticky top-0 bg-slate-50">
+              <table className="min-w-full divide-y divide-line">
+                <thead className="sticky top-0 bg-soft">
                   <tr>
                     <th className="th">{t("camera.code")}</th>
                     <th className="th">{t("camera.name")}</th>
@@ -221,11 +238,11 @@ export default function AnalyticsPage() {
                     <th className="th text-right">{t("analytics.accuracy")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {items.map((row) => {
                     const reviewed = row.confirmed + row.rejected;
                     return (
-                      <tr key={row.id} className="hover:bg-slate-50">
+                      <tr key={row.id} className="hover:bg-soft">
                         <td className="td font-mono text-xs">{row.code}</td>
                         <td className="td">{row.name}</td>
                         <td className="td">

@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -5,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -14,31 +16,68 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  type LabelProps,
 } from "recharts";
 
 import { formatBucket, formatNumber, formatPct } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { HeatCell, Timeseries, TypeCount } from "@/lib/types";
 
-const FALLBACK_COLORS = ["#625fee", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#0ea5e9", "#f97316", "#64748b"];
+export const INK = "#121212";
+export const ACCENT = "#7fdd5c";
+const MUTED_BAR = "#dcdcd9";
+const GRID = "#efefed";
+const TICK = { fontSize: 11, fill: "#8a8a87" };
 
-export const TOOLTIP_STYLE = {
-  contentStyle: {
-    borderRadius: 12,
-    border: "1px solid #eceef3",
-    boxShadow: "0 4px 12px rgba(16, 24, 40, 0.08)",
-    fontSize: 12,
-    padding: "8px 12px",
-  },
-  cursor: { fill: "rgba(98, 95, 238, 0.06)" },
-};
+const FALLBACK_COLORS = [INK, ACCENT, "#f59e0b", "#f43f5e", "#8b5cf6", "#0ea5e9", "#f97316", "#a3a3a3"];
 
 export const colorAt = (color: string | null, index: number): string =>
-  color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length] ?? "#64748b";
+  color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length] ?? "#a3a3a3";
 
-export function Sparkline({ values, color = "#625fee" }: { values: number[]; color?: string }) {
+interface TooltipEntry {
+  name?: string | number;
+  value?: number | string | (number | string)[];
+  color?: string;
+}
+
+/** Dark tooltip bubble used by every chart. */
+function InkTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipEntry[]; label?: string | number }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-2xl bg-ink px-3 py-2 text-xs text-white shadow-pop">
+      {label !== undefined && label !== "" && <div className="mb-1 text-white/50">{label}</div>}
+      {payload.map((entry, index) => (
+        <div key={`${entry.name}-${index}`} className="flex items-center gap-2">
+          {payload.length > 1 && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />}
+          {payload.length > 1 && <span className="text-white/60">{entry.name}</span>}
+          <span className="ml-auto font-semibold">{typeof entry.value === "number" ? formatNumber(entry.value) : String(entry.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const tooltip = <Tooltip content={<InkTooltip />} cursor={{ fill: "rgba(0,0,0,0.03)" }} />;
+
+/** Diagonal hatch fills (muted and accent); called as a function because Recharts only renders raw <defs> children. */
+function hatchDefs(id: string) {
+  return (
+    <defs>
+      <pattern id={`${id}-muted`} patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+        <rect width="7" height="7" fill="#ececea" />
+        <line x1="0" y1="0" x2="0" y2="7" stroke="#dededb" strokeWidth="3" />
+      </pattern>
+      <pattern id={`${id}-accent`} patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+        <rect width="7" height="7" fill={ACCENT} />
+        <line x1="0" y1="0" x2="0" y2="7" stroke="#6fcf4d" strokeWidth="3" />
+      </pattern>
+    </defs>
+  );
+}
+
+export function Sparkline({ values, color = ACCENT }: { values: number[]; color?: string }) {
+  const id = useId().replace(/:/g, "");
   const data = values.map((value, index) => ({ index, value }));
-  const id = `spark-${color.replace("#", "")}`;
   return (
     <ResponsiveContainer width="100%" height={36}>
       <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
@@ -48,8 +87,103 @@ export function Sparkline({ values, color = "#625fee" }: { values: number[]; col
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <Area type="monotone" dataKey="value" stroke={color} strokeWidth={1.8} fill={`url(#${id})`} isAnimationActive={false} />
+        <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill={`url(#${id})`} isAnimationActive={false} />
       </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Smooth area trend with a highlighted last value; used for the "today" hero card. */
+export function TrendArea({ data, height = 120 }: { data: { label: string; value: number }[]; height?: number }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={ACCENT} stopOpacity={0.45} />
+            <stop offset="100%" stopColor={ACCENT} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="label" hide />
+        {tooltip}
+        <Area type="monotone" dataKey="value" name={t("common.total")} stroke="#55c235" strokeWidth={2.2} fill={`url(#${id})`} activeDot={{ r: 5, fill: INK, stroke: "#fff", strokeWidth: 2 }} />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Dense thin bars; the hovered (or largest) bar and its neighbours are drawn in ink. */
+export function VolumeBars({ data, height = 200 }: { data: { label: string; value: number }[]; height?: number }) {
+  const maxIndex = data.reduce((best, item, index, all) => (item.value > (all[best]?.value ?? -1) ? index : best), 0);
+  const [active, setActive] = useState<number | null>(null);
+  const focus = active ?? maxIndex;
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart
+        data={data}
+        margin={{ top: 8, right: 0, bottom: 0, left: 0 }}
+        barCategoryGap="22%"
+        onMouseMove={(state) => setActive(typeof state.activeTooltipIndex === "number" ? state.activeTooltipIndex : null)}
+        onMouseLeave={() => setActive(null)}
+      >
+        <XAxis dataKey="label" tick={TICK} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} />
+        <Tooltip content={<InkTooltip />} cursor={false} />
+        <Bar dataKey="value" name={t("common.total")} radius={[3, 3, 3, 3]} isAnimationActive={false}>
+          {data.map((item, index) => (
+            <Cell key={item.label} fill={Math.abs(index - focus) <= 3 ? INK : MUTED_BAR} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Rounded hatched columns; the highlighted column is accent green with a dark value bubble above it. */
+export function HatchedColumns({
+  data,
+  height = 220,
+  highlight,
+  showAxis = true,
+}: {
+  data: { label: string; value: number }[];
+  height?: number;
+  highlight?: number;
+  showAxis?: boolean;
+}) {
+  const id = useId().replace(/:/g, "");
+  const maxIndex = data.reduce((best, item, index, all) => (item.value > (all[best]?.value ?? -1) ? index : best), 0);
+  const focus = highlight ?? maxIndex;
+  const renderLabel = (props: LabelProps & { index?: number }) => {
+    if (props.index !== focus) return null;
+    const x = Number(props.x ?? 0) + Number(props.width ?? 0) / 2;
+    const y = Number(props.y ?? 0) - 12;
+    const text = formatNumber(Number(props.value ?? 0));
+    const width = Math.max(34, text.length * 7 + 16);
+    return (
+      <g>
+        <rect x={x - width / 2} y={y - 20} width={width} height={22} rx={8} fill={INK} />
+        <text x={x} y={y - 5} textAnchor="middle" fontSize={11} fontWeight={600} fill="#fff">
+          {text}
+        </text>
+      </g>
+    );
+  };
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 34, right: 4, bottom: 0, left: showAxis ? -18 : 4 }} barCategoryGap="18%">
+        {hatchDefs(id)}
+        {showAxis && <CartesianGrid stroke={GRID} vertical={false} />}
+        <XAxis dataKey="label" tick={TICK} tickLine={false} axisLine={false} />
+        {showAxis && <YAxis tick={TICK} tickLine={false} axisLine={false} allowDecimals={false} />}
+        <Tooltip content={<InkTooltip />} cursor={false} />
+        <Bar dataKey="value" name={t("common.total")} radius={[10, 10, 10, 10]} isAnimationActive={false}>
+          {data.map((item, index) => (
+            <Cell key={item.label} fill={index === focus ? `url(#${id}-accent)` : `url(#${id}-muted)`} />
+          ))}
+          <LabelList dataKey="value" content={renderLabel} />
+        </Bar>
+      </BarChart>
     </ResponsiveContainer>
   );
 }
@@ -64,14 +198,21 @@ export function TimeseriesChart({ data, height = 280, stacked = false }: { data:
   if (stacked) {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
-          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
-          <Tooltip {...TOOLTIP_STYLE} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+        <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }} barCategoryGap="20%">
+          <CartesianGrid stroke={GRID} vertical={false} />
+          <XAxis dataKey="label" tick={TICK} tickLine={false} axisLine={false} />
+          <YAxis tick={TICK} tickLine={false} axisLine={false} allowDecimals={false} />
+          {tooltip}
+          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
           {data.series.map((series, index) => (
-            <Bar key={series.code} dataKey={series.code} name={series.name} stackId="a" fill={colorAt(series.color, index)} />
+            <Bar
+              key={series.code}
+              dataKey={series.code}
+              name={series.name}
+              stackId="a"
+              fill={colorAt(series.color, index)}
+              radius={index === data.series.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+            />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -81,12 +222,12 @@ export function TimeseriesChart({ data, height = 280, stacked = false }: { data:
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <Tooltip {...TOOLTIP_STYLE} />
-        <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Line type="monotone" dataKey="total" name={t("common.total")} stroke="#625fee" strokeWidth={2.5} dot={false} />
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="label" tick={TICK} tickLine={false} axisLine={false} />
+        <YAxis tick={TICK} tickLine={false} axisLine={false} allowDecimals={false} />
+        <Tooltip content={<InkTooltip />} />
+        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+        <Line type="monotone" dataKey="total" name={t("common.total")} stroke={INK} strokeWidth={2.5} dot={false} />
         {data.series.slice(0, 4).map((series, index) => (
           <Line
             key={series.code}
@@ -103,76 +244,86 @@ export function TimeseriesChart({ data, height = 280, stacked = false }: { data:
   );
 }
 
-export function DonutChart({ items, total, height = 220 }: { items: TypeCount[]; total: number; height?: number }) {
+export function DonutChart({ items, total, height = 200 }: { items: TypeCount[]; total: number; height?: number }) {
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row">
-      <div className="relative w-full max-w-[220px]" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={items} dataKey="count" nameKey="name" innerRadius="62%" outerRadius="95%" paddingAngle={2} isAnimationActive={false}>
-              {items.map((item, index) => (
-                <Cell key={item.code} fill={colorAt(item.color, index)} />
-              ))}
-            </Pie>
-            <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatNumber(value)} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-bold text-navy-900">{formatNumber(total)}</span>
-          <span className="text-xs text-slate-500">{t("common.total")}</span>
+    <div className="@container">
+      <div className="flex flex-col items-center gap-5 @sm:flex-row">
+        <div className="relative w-full max-w-[200px] shrink-0" style={{ height }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={items}
+                dataKey="count"
+                nameKey="name"
+                innerRadius="70%"
+                outerRadius="100%"
+                paddingAngle={3}
+                cornerRadius={6}
+                stroke="none"
+                isAnimationActive={false}
+              >
+                {items.map((item, index) => (
+                  <Cell key={item.code} fill={colorAt(item.color, index)} />
+                ))}
+              </Pie>
+              <Tooltip content={<InkTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-2xl font-semibold tracking-tight text-ink">{formatNumber(total)}</span>
+            <span className="text-[11px] text-mute">{t("common.total")}</span>
+          </div>
         </div>
+        <ul className="w-full space-y-2.5 text-[13px]">
+          {items.map((item, index) => (
+            <li key={item.code} className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorAt(item.color, index) }} />
+                <span className="truncate text-ink/80">{item.name}</span>
+              </span>
+              <span className="shrink-0 font-medium text-ink">
+                {formatNumber(item.count)} <span className="text-mute">· {formatPct(item.pct)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul className="w-full space-y-1.5 text-sm">
-        {items.map((item, index) => (
-          <li key={item.code} className="flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorAt(item.color, index) }} />
-              <span className="truncate text-slate-700">{item.name}</span>
-            </span>
-            <span className="shrink-0 text-slate-500">
-              {formatNumber(item.count)} · {formatPct(item.pct)}
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
 
-export function HorizontalBars({ items, height }: { items: { label: string; count: number; color?: string | null }[]; height?: number }) {
+/** Ranked list rendered as labelled progress bars. */
+export function HorizontalBars({ items, color }: { items: { label: string; count: number; color?: string | null; sublabel?: string | null }[]; color?: string }) {
+  const max = Math.max(1, ...items.map((item) => item.count));
   return (
-    <ResponsiveContainer width="100%" height={height ?? Math.max(160, items.length * 34)}>
-      <BarChart data={items} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
-        <XAxis type="number" hide />
-        <YAxis type="category" dataKey="label" width={150} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
-        <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatNumber(value)} />
-        <Bar dataKey="count" name={t("common.total")} radius={[0, 4, 4, 0]} barSize={16}>
-          {items.map((item, index) => (
-            <Cell key={item.label} fill={colorAt(item.color ?? null, index)} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <ul className="space-y-3">
+      {items.map((item, index) => (
+        <li key={`${item.label}-${index}`}>
+          <div className="mb-1 flex items-baseline justify-between gap-3 text-[13px]">
+            <span className="min-w-0 truncate text-ink/85">
+              {item.label}
+              {item.sublabel && <span className="ml-1.5 text-xs text-mute">{item.sublabel}</span>}
+            </span>
+            <span className="shrink-0 font-semibold text-ink">{formatNumber(item.count)}</span>
+          </div>
+          <div className="h-2 rounded-full bg-soft">
+            <div
+              className="h-2 rounded-full"
+              style={{ width: `${(item.count / max) * 100}%`, backgroundColor: item.color ?? color ?? (index === 0 ? ACCENT : INK) }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-export function ColumnChart({ data, xKey, yKey, color = "#625fee", height = 240 }: {
-  data: Record<string, number | string>[];
-  xKey: string;
-  yKey: string;
-  color?: string;
-  height?: number;
-}) {
+export function ColumnChart({ data, xKey, yKey, height = 240 }: { data: Record<string, number | string>[]; xKey: string; yKey: string; color?: string; height?: number }) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" vertical={false} />
-        <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-        <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
-        <Tooltip {...TOOLTIP_STYLE} />
-        <Bar dataKey={yKey} name={t("common.total")} fill={color} radius={[6, 6, 0, 0]} maxBarSize={28} />
-      </BarChart>
-    </ResponsiveContainer>
+    <HatchedColumns
+      height={height}
+      data={data.map((row) => ({ label: String(row[xKey] ?? ""), value: Number(row[yKey] ?? 0) }))}
+    />
   );
 }
 
@@ -182,12 +333,12 @@ export function WeekHourHeatmap({ cells }: { cells: HeatCell[] }) {
   const hours = Array.from({ length: 24 }, (_, hour) => hour);
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-separate border-spacing-0.5 text-[10px]">
+      <table className="w-full border-separate border-spacing-[3px] text-[10px]">
         <thead>
           <tr>
             <th />
             {hours.map((hour) => (
-              <th key={hour} className="font-normal text-slate-400">
+              <th key={hour} className="font-normal text-mute">
                 {hour}
               </th>
             ))}
@@ -196,15 +347,16 @@ export function WeekHourHeatmap({ cells }: { cells: HeatCell[] }) {
         <tbody>
           {[1, 2, 3, 4, 5, 6, 7].map((weekday) => (
             <tr key={weekday}>
-              <td className="pr-1 text-xs text-slate-500">{t(`weekday.${weekday}` as "weekday.1")}</td>
+              <td className="pr-1 text-xs text-mute">{t(`weekday.${weekday}` as "weekday.1")}</td>
               {hours.map((hour) => {
                 const count = lookup.get(`${weekday}-${hour}`) ?? 0;
+                const ratio = count / max;
                 return (
                   <td
                     key={hour}
                     title={`${count}`}
-                    className="h-6 min-w-5 rounded"
-                    style={{ backgroundColor: `rgba(98, 95, 238, ${0.06 + (count / max) * 0.9})` }}
+                    className="h-6 min-w-5 rounded-md"
+                    style={{ backgroundColor: ratio > 0.85 ? INK : `rgba(95, 205, 60, ${0.08 + ratio * 0.85})` }}
                   />
                 );
               })}

@@ -1,4 +1,4 @@
-import { AlertOctagon, AlertTriangle, Bell, Info, ShieldAlert, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, Bell, CheckCheck, Info, ShieldAlert, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -9,11 +9,11 @@ import { t } from "@/lib/i18n";
 import type { NotificationState, NotificationType } from "@/lib/types";
 
 const TYPE_ICON: Record<NotificationType, { icon: LucideIcon; className: string }> = {
-  CRITICAL: { icon: AlertOctagon, className: "bg-red-50 text-red-600" },
-  WARNING: { icon: AlertTriangle, className: "bg-amber-50 text-amber-600" },
-  INFO: { icon: Info, className: "bg-sky-50 text-sky-600" },
-  SYSTEM: { icon: Bell, className: "bg-slate-100 text-slate-600" },
-  VIOLATION: { icon: ShieldAlert, className: "bg-violet-50 text-violet-600" },
+  CRITICAL: { icon: AlertOctagon, className: "bg-rose-100 text-rose-600" },
+  WARNING: { icon: AlertTriangle, className: "bg-amber-100 text-amber-600" },
+  INFO: { icon: Info, className: "bg-soft text-ink" },
+  SYSTEM: { icon: Bell, className: "bg-soft text-ink/70" },
+  VIOLATION: { icon: ShieldAlert, className: "bg-ink text-white" },
 };
 
 const TABS: { state?: NotificationState; label: string }[] = [
@@ -34,45 +34,43 @@ export default function NotificationsPage() {
     <>
       <PageHeader
         title={t("nav.notifications")}
+        subtitle="Tizim, kamera va qoidabuzarlik bo‘yicha ogohlantirishlar"
         actions={
-          <button type="button" className="btn-secondary" disabled={readAll.isPending} onClick={() => readAll.mutate()}>
-            {t("notifications.markAllRead")}
+          <button type="button" className="btn-primary" disabled={readAll.isPending} onClick={() => readAll.mutate()}>
+            <CheckCheck className="h-4 w-4" /> {t("notifications.markAllRead")}
           </button>
         }
       />
+      <div className="mb-4 flex flex-wrap gap-2">
+        {TABS.map((tab) => (
+          <button
+            key={tab.label}
+            type="button"
+            onClick={() => {
+              setState(tab.state);
+              setPage(1);
+            }}
+            className={cn("pill", state === tab.state && "pill-active")}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
       <Card>
-        <div className="flex gap-1 border-b border-slate-100 px-4">
-          {TABS.map((tab) => (
-            <button
-              key={tab.label}
-              type="button"
-              onClick={() => {
-                setState(tab.state);
-                setPage(1);
-              }}
-              className={cn(
-                "-mb-px border-b-2 px-3 py-3 text-sm font-medium",
-                state === tab.state ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700",
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
         <QueryView query={notifications} isEmpty={(data) => data.items.length === 0}>
           {(data) => (
             <>
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line">
                 {data.items.map((item) => {
                   const { icon: Icon, className } = TYPE_ICON[item.type];
                   return (
-                    <li key={item.id} className={cn("flex gap-4 px-5 py-4", item.state === "UNREAD" && "bg-brand-50/40")}>
-                      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", className)}>
+                    <li key={item.id} className={cn("flex gap-4 px-5 py-4", item.state === "UNREAD" && "bg-accent-50/60")}>
+                      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", className)}>
                         <Icon className="h-[18px] w-[18px]" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
-                          <p className={cn("text-sm", item.state === "UNREAD" ? "font-semibold text-slate-900" : "text-slate-700")}>
+                          <p className={cn("text-sm", item.state === "UNREAD" ? "font-semibold text-ink" : "text-ink/80")}>
                             {item.link ? (
                               <Link to={item.link} className="hover:underline">
                                 {item.title}
@@ -81,21 +79,21 @@ export default function NotificationsPage() {
                               item.title
                             )}
                           </p>
-                          <span className="shrink-0 text-xs text-slate-400">{formatRelative(item.created_at)}</span>
+                          <span className="shrink-0 text-xs text-mute">{formatRelative(item.created_at)}</span>
                         </div>
-                        <p className="mt-0.5 text-sm text-slate-600">{item.message}</p>
+                        <p className="mt-0.5 text-sm text-ink/70">{item.message}</p>
                         <div className="mt-2 flex gap-3 text-xs">
                           {item.state === "UNREAD" ? (
-                            <button type="button" className="text-brand-700 hover:underline" onClick={() => action.mutate({ id: item.id, action: "read" })}>
+                            <button type="button" className="font-semibold text-ink hover:underline" onClick={() => action.mutate({ id: item.id, action: "read" })}>
                               {t("notifications.markRead")}
                             </button>
                           ) : (
-                            <button type="button" className="text-slate-500 hover:underline" onClick={() => action.mutate({ id: item.id, action: "unread" })}>
+                            <button type="button" className="text-mute hover:underline" onClick={() => action.mutate({ id: item.id, action: "unread" })}>
                               {t("notifications.markUnread")}
                             </button>
                           )}
                           {item.state !== "ARCHIVED" && (
-                            <button type="button" className="text-slate-500 hover:underline" onClick={() => action.mutate({ id: item.id, action: "archive" })}>
+                            <button type="button" className="text-mute hover:underline" onClick={() => action.mutate({ id: item.id, action: "archive" })}>
                               {t("notifications.archive")}
                             </button>
                           )}

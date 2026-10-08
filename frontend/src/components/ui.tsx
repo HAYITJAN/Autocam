@@ -1,82 +1,163 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowUpRight,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Folder,
   Inbox,
-  Info,
   Loader2,
+  MoveRight,
   X,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { ApiError } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/format";
 import { t, tDynamic } from "@/lib/i18n";
-import type {
-  CameraStatus,
-  PageMeta,
-  Severity,
-  TimeRange,
-  VehicleStatus,
-  ViolationStatus,
-} from "@/lib/types";
+import type { CameraStatus, PageMeta, Severity, TimeRange, VehicleStatus, ViolationStatus } from "@/lib/types";
+
+// ------------------------------------------------------------------ text
+
+/** Renders a figure with its fractional / secondary part dimmed, e.g. 97<dim>.9%</dim> or 41<dim> / 45</dim>. */
+export function Figure({ value, className }: { value: ReactNode; className?: string }) {
+  if (typeof value !== "string" && typeof value !== "number") return <span className={className}>{value}</span>;
+  const text = String(value);
+  const match = /^(.*?\d)((?:\.\d+|\s\/\s).*)$/.exec(text);
+  if (!match) return <span className={className}>{text}</span>;
+  return (
+    <span className={className}>
+      {match[1]}
+      <span className="text-ink/25">{match[2]}</span>
+    </span>
+  );
+}
+
+export function DeltaChip({ value, positiveIsGood = true, suffix = "%" }: { value: number | null | undefined; positiveIsGood?: boolean; suffix?: string }) {
+  if (value === null || value === undefined) return null;
+  const good = (value >= 0) === positiveIsGood;
+  return (
+    <span className={good ? "chip-up" : "chip-down"}>
+      {value >= 0 ? "+" : "−"}
+      {Math.abs(value).toFixed(1)}
+      {suffix}
+    </span>
+  );
+}
+
+// ----------------------------------------------------------------- cards
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return <section className={cn("card", className)}>{children}</section>;
 }
 
-export function CardHeader({ title, action, subtitle }: { title: string; action?: ReactNode; subtitle?: string }) {
+export function ArrowLink({ to, label = t("common.viewAll") }: { to: string; label?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+    <Link to={to} className="icon-btn h-9 w-9" title={label} aria-label={label}>
+      <ArrowUpRight className="h-4 w-4" />
+    </Link>
+  );
+}
+
+export function CardHeader({ title, action, subtitle, to }: { title: string; action?: ReactNode; subtitle?: string; to?: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-5">
       <div className="min-w-0">
-        <h2 className="truncate text-[15px] font-semibold text-navy-900">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+        <h2 className="truncate text-[17px] font-semibold tracking-tight text-ink">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-xs text-mute">{subtitle}</p>}
       </div>
-      {action}
+      <div className="flex shrink-0 items-center gap-2">
+        {action}
+        {to && <ArrowLink to={to} />}
+      </div>
     </div>
   );
 }
 
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+export interface Crumb {
+  label: string;
+  to?: string;
+}
+
+export function Breadcrumbs({ items }: { items: Crumb[] }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-bold leading-tight tracking-tight text-navy-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-[13px] text-slate-500">{subtitle}</p>}
+    <nav className="flex flex-wrap items-center gap-1.5 text-xs text-mute" aria-label="breadcrumb">
+      {items.map((item, index) => (
+        <Fragment key={`${item.label}-${index}`}>
+          {index > 0 && <MoveRight className="h-3.5 w-3.5 text-ink/30" />}
+          <span className="inline-flex items-center gap-1">
+            <Folder className="h-3.5 w-3.5" />
+            {item.to ? (
+              <Link to={item.to} className="hover:text-ink">
+                {item.label}
+              </Link>
+            ) : (
+              <span className="text-ink/60">{item.label}</span>
+            )}
+          </span>
+        </Fragment>
+      ))}
+    </nav>
+  );
+}
+
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  stats,
+  crumbs,
+}: {
+  title: ReactNode;
+  subtitle?: string;
+  actions?: ReactNode;
+  stats?: ReactNode;
+  crumbs?: Crumb[];
+}) {
+  const trail = crumbs ?? [{ label: "Bosh sahifa", to: "/" }, { label: typeof title === "string" ? title : "" }];
+  return (
+    <div className="mb-6 space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <Breadcrumbs items={trail} />
+          <h1 className="mt-2 text-[30px] font-medium leading-tight tracking-tight text-ink sm:text-[34px]">{title}</h1>
+          {subtitle && <p className="mt-1 text-[13px] text-mute">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+      {stats && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">{stats}</div>}
     </div>
   );
 }
 
 export const ICON_TONES = {
-  blue: "bg-brand-600 shadow-brand-600/30",
-  green: "bg-emerald-500 shadow-emerald-500/30",
-  red: "bg-rose-500 shadow-rose-500/30",
-  amber: "bg-amber-400 shadow-amber-400/30",
-  violet: "bg-violet-500 shadow-violet-500/30",
-  sky: "bg-sky-500 shadow-sky-500/30",
-  pink: "bg-pink-500 shadow-pink-500/30",
-  slate: "bg-slate-400 shadow-slate-400/30",
+  blue: "bg-ink text-white",
+  green: "bg-accent-300 text-ink",
+  red: "bg-rose-100 text-rose-600",
+  amber: "bg-amber-100 text-amber-600",
+  violet: "bg-violet-100 text-violet-600",
+  sky: "bg-sky-100 text-sky-600",
+  pink: "bg-pink-100 text-pink-600",
+  slate: "bg-soft text-ink/70",
 } as const;
 
 export type IconTone = keyof typeof ICON_TONES;
 
 export function IconBadge({ icon: Icon, tone, className }: { icon: LucideIcon; tone: IconTone; className?: string }) {
   return (
-    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white shadow-md", ICON_TONES[tone], className)}>
-      <Icon className="h-[18px] w-[18px]" />
+    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", ICON_TONES[tone], className)}>
+      <Icon className="h-[17px] w-[17px]" />
     </div>
   );
 }
 
-/** Compact KPI used in page headers: coloured icon, value, label, optional delta and sparkline. */
+/** KPI card: label + icon, large figure, delta chip / hint and an optional sparkline. */
 export function KpiTile({
-  icon: Icon,
+  icon,
   tone,
   label,
   value,
@@ -96,34 +177,29 @@ export function KpiTile({
   spark?: ReactNode;
   className?: string;
 }) {
-  const hasDelta = delta !== null && delta !== undefined;
-  const good = hasDelta ? (delta >= 0) === deltaPositiveIsGood : null;
   return (
-    <div className={cn("card relative flex min-w-[170px] flex-col px-4 py-3.5", className)}>
-      <span className="absolute right-3 top-3 text-slate-300" title={label}>
-        <Info className="h-4 w-4" />
-      </span>
-      <div className="flex items-center gap-3 pr-5">
-        <IconBadge icon={Icon} tone={tone} />
-        <p className="truncate text-xl font-bold leading-tight tracking-tight text-navy-900">{value}</p>
+    <div className={cn("card flex min-w-0 flex-col p-5", className)}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="truncate pt-1 text-[13px] font-medium text-mute">{label}</p>
+        <IconBadge icon={icon} tone={tone} />
       </div>
-      <p className="mt-2.5 truncate text-[13px] text-slate-500">{label}</p>
-      {hasDelta || hint || spark ? (
-        <div className="mt-1 flex items-end justify-between gap-2">
-          <p className="flex min-w-0 items-center gap-1.5 text-[11px]">
-            {hasDelta && (
-              <span className={cn("rounded-md px-1.5 py-0.5 font-semibold", good ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600")}>
-                {delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}%
-              </span>
-            )}
-            {hint && <span className="truncate text-slate-400">{hint}</span>}
+      <p className="mt-1 truncate text-[28px] font-semibold leading-tight tracking-tight text-ink">
+        <Figure value={value} />
+      </p>
+      {delta !== undefined || hint || spark ? (
+        <div className="mt-2 flex min-h-6 items-end justify-between gap-2">
+          <p className="flex min-w-0 items-center gap-2 text-xs">
+            <DeltaChip value={delta} positiveIsGood={deltaPositiveIsGood} />
+            {hint && <span className="truncate text-mute">{hint}</span>}
           </p>
-          {spark && <div className="w-20 shrink-0">{spark}</div>}
+          {spark && <div className="w-24 shrink-0">{spark}</div>}
         </div>
       ) : null}
     </div>
   );
 }
+
+// ------------------------------------------------------------------ tabs
 
 export interface TabItem<T extends string> {
   value: T;
@@ -132,39 +208,25 @@ export interface TabItem<T extends string> {
   tone?: "blue" | "green" | "red" | "amber" | "violet";
 }
 
-const COUNT_TONES = {
-  blue: "bg-brand-50 text-brand-700",
-  green: "bg-emerald-50 text-emerald-600",
-  red: "bg-rose-50 text-rose-600",
-  amber: "bg-amber-50 text-amber-600",
-  violet: "bg-violet-50 text-violet-600",
+const COUNT_DOTS = {
+  blue: "bg-ink",
+  green: "bg-accent-500",
+  red: "bg-rose-500",
+  amber: "bg-amber-400",
+  violet: "bg-violet-500",
 } as const;
 
-export function CountTabs<T extends string>({
-  items,
-  value,
-  onChange,
-}: {
-  items: TabItem<T>[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
+export function CountTabs<T extends string>({ items, value, onChange }: { items: TabItem<T>[]; value: T; onChange: (value: T) => void }) {
   return (
-    <div className="segmented">
+    <div className="flex flex-wrap items-center gap-2">
       {items.map((item) => {
         const active = item.value === value;
         return (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => onChange(item.value)}
-            className={cn("segmented-item px-3.5 py-2 text-[13px]", active && "segmented-active")}
-          >
+          <button key={item.value} type="button" onClick={() => onChange(item.value)} className={cn("pill", active && "pill-active")}>
+            {item.tone && <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-white" : COUNT_DOTS[item.tone])} />}
             {item.label}
             {item.count !== undefined && (
-              <span className={cn("rounded-md px-1.5 py-px text-[11px] font-semibold", COUNT_TONES[item.tone ?? "blue"])}>
-                {formatNumber(item.count)}
-              </span>
+              <span className={cn("text-xs font-semibold", active ? "text-white/60" : "text-mute")}>{formatNumber(item.count)}</span>
             )}
           </button>
         );
@@ -173,13 +235,28 @@ export function CountTabs<T extends string>({
   );
 }
 
+export function RangeTabs({ value, onChange }: { value: TimeRange; onChange: (range: TimeRange) => void }) {
+  const ranges: TimeRange[] = ["24h", "7d", "30d"];
+  return (
+    <div className="segmented">
+      {ranges.map((range) => (
+        <button key={range} type="button" onClick={() => onChange(range)} className={cn("segmented-item", value === range && "segmented-active")}>
+          {t(`range.${range}`)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------- panel
+
 export function SidePanel({ title, badge, onClose, children }: { title: ReactNode; badge?: ReactNode; onClose: () => void; children: ReactNode }) {
   return (
-    <aside className="card flex max-h-[calc(100vh-7rem)] flex-col overflow-hidden xl:sticky xl:top-20">
-      <div className="flex items-center gap-2 border-b border-line px-4 py-3.5">
-        <h2 className="min-w-0 flex-1 truncate text-[15px] font-bold text-navy-900">{title}</h2>
+    <aside className="card flex max-h-[calc(100vh-7rem)] flex-col overflow-hidden xl:sticky xl:top-24">
+      <div className="flex items-center gap-2 px-5 pb-3 pt-5">
+        <h2 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-ink">{title}</h2>
         {badge}
-        <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="close">
+        <button type="button" onClick={onClose} className="icon-btn h-8 w-8" aria-label="close">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -188,26 +265,22 @@ export function SidePanel({ title, badge, onClose, children }: { title: ReactNod
   );
 }
 
+// ---------------------------------------------------------------- badges
+
 type Tone = "green" | "red" | "amber" | "blue" | "slate" | "violet";
 
 const toneClasses: Record<Tone, string> = {
-  green: "bg-emerald-50 text-emerald-600",
+  green: "bg-accent-100 text-accent-700",
   red: "bg-rose-50 text-rose-600",
-  amber: "bg-amber-50 text-amber-600",
-  blue: "bg-brand-50 text-brand-600",
-  slate: "bg-slate-100 text-slate-500",
-  violet: "bg-violet-50 text-violet-600",
+  amber: "bg-amber-50 text-amber-700",
+  blue: "bg-sky-50 text-sky-700",
+  slate: "bg-soft text-mute",
+  violet: "bg-violet-50 text-violet-700",
 };
 
 export function Badge({ tone = "slate", children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold",
-        toneClasses[tone],
-        className,
-      )}
-    >
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold", toneClasses[tone], className)}>
       {children}
     </span>
   );
@@ -239,35 +312,35 @@ export const VehicleStatusBadge = ({ status }: { status: VehicleStatus }) => (
   <Badge tone={vehicleTone[status]}>{tDynamic("vehicle.status", status)}</Badge>
 );
 
-export const SeverityBadge = ({ severity }: { severity: Severity }) => (
-  <Badge tone={severityTone[severity]}>{tDynamic("severity", severity)}</Badge>
-);
+export const SeverityBadge = ({ severity }: { severity: Severity }) => <Badge tone={severityTone[severity]}>{tDynamic("severity", severity)}</Badge>;
 
 export function TypeChip({ name, color }: { name: string; color: string | null }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
-      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color ?? "#94a3b8" }} />
+    <span className="inline-flex items-center gap-1.5 text-[13px]">
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color ?? "#a3a3a3" }} />
       {name}
     </span>
   );
 }
 
 export function PlateNumber({ value }: { value: string | null }) {
-  if (!value) return <span className="text-slate-400">—</span>;
+  if (!value) return <span className="text-mute">—</span>;
   return (
-    <span className="inline-block whitespace-nowrap rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-slate-800">
+    <span className="inline-block whitespace-nowrap rounded-md border border-ink/15 bg-white px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wider text-ink">
       {value}
     </span>
   );
 }
 
+// ---------------------------------------------------------------- states
+
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn("h-5 w-5 animate-spin text-brand-600", className)} />;
+  return <Loader2 className={cn("h-5 w-5 animate-spin text-ink", className)} />;
 }
 
 export function LoadingBlock({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center justify-center gap-2 py-10 text-sm text-slate-500", className)}>
+    <div className={cn("flex items-center justify-center gap-2 py-10 text-[13px] text-mute", className)}>
       <Spinner /> {t("common.loading")}
     </div>
   );
@@ -276,7 +349,7 @@ export function LoadingBlock({ className }: { className?: string }) {
 export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const message = error instanceof ApiError ? error.message : t("common.error");
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-sm text-slate-600">
+    <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-[13px] text-ink/70">
       <AlertTriangle className="h-6 w-6 text-amber-500" />
       <p>{message}</p>
       {onRetry && (
@@ -290,8 +363,10 @@ export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () =>
 
 export function EmptyBlock({ message = t("common.empty") }: { message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-slate-500">
-      <Inbox className="h-6 w-6 text-slate-400" />
+    <div className="flex flex-col items-center justify-center gap-2 py-10 text-[13px] text-mute">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-soft">
+        <Inbox className="h-5 w-5" />
+      </span>
       {message}
     </div>
   );
@@ -315,6 +390,8 @@ export function QueryView<T>({
   return <>{children(query.data)}</>;
 }
 
+// ------------------------------------------------------------ pagination
+
 function pageWindow(page: number, pages: number): (number | "…")[] {
   if (pages <= 7) return Array.from({ length: pages }, (_, index) => index + 1);
   const result: (number | "…")[] = [1];
@@ -327,17 +404,20 @@ function pageWindow(page: number, pages: number): (number | "…")[] {
   return result;
 }
 
-export function Pagination({ meta, onPage }: { meta: PageMeta; onPage: (page: number) => void }) {
+export function Pagination({ meta, onPage, extra }: { meta: PageMeta; onPage: (page: number) => void; extra?: ReactNode }) {
   const from = meta.total === 0 ? 0 : (meta.page - 1) * meta.page_size + 1;
   const to = Math.min(meta.page * meta.page_size, meta.total);
-  const pageButton = "flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 text-xs font-medium transition";
-  const arrow = cn(pageButton, "text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent");
+  const pageButton = "flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-semibold transition";
+  const arrow = cn(pageButton, "text-mute hover:bg-soft hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent");
   const lastPage = Math.max(meta.pages, 1);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-xs text-slate-500">
-      <span>
-        {formatNumber(from)}–{formatNumber(to)} / {formatNumber(meta.total)} ta natija
-      </span>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3.5 text-xs text-mute">
+      <div className="flex items-center gap-3">
+        {extra}
+        <span>
+          {formatNumber(from)}–{formatNumber(to)} / {formatNumber(meta.total)} ta natija
+        </span>
+      </div>
       <div className="flex items-center gap-0.5">
         <button type="button" className={arrow} disabled={meta.page <= 1} onClick={() => onPage(1)} aria-label="first">
           <ChevronsLeft className="h-4 w-4" />
@@ -347,7 +427,7 @@ export function Pagination({ meta, onPage }: { meta: PageMeta; onPage: (page: nu
         </button>
         {pageWindow(meta.page, lastPage).map((item, index) =>
           item === "…" ? (
-            <span key={`gap-${index}`} className="px-1 text-slate-400">
+            <span key={`gap-${index}`} className="px-1 text-mute">
               …
             </span>
           ) : (
@@ -355,10 +435,7 @@ export function Pagination({ meta, onPage }: { meta: PageMeta; onPage: (page: nu
               key={item}
               type="button"
               onClick={() => onPage(item)}
-              className={cn(
-                pageButton,
-                item === meta.page ? "bg-brand-600 text-white shadow-sm shadow-brand-600/30" : "text-slate-600 hover:bg-slate-100",
-              )}
+              className={cn(pageButton, item === meta.page ? "bg-ink text-white" : "text-ink/70 hover:bg-soft")}
             >
               {item}
             </button>
@@ -375,49 +452,45 @@ export function Pagination({ meta, onPage }: { meta: PageMeta; onPage: (page: nu
   );
 }
 
-export function RangeTabs({ value, onChange }: { value: TimeRange; onChange: (range: TimeRange) => void }) {
-  const ranges: TimeRange[] = ["24h", "7d", "30d"];
+export function PageSizeSelect({ value, onChange }: { value: number; onChange: (size: number) => void }) {
   return (
-    <div className="segmented">
-      {ranges.map((range) => (
-        <button
-          key={range}
-          type="button"
-          onClick={() => onChange(range)}
-          className={cn("segmented-item px-2.5 py-1", value === range && "segmented-active")}
-        >
-          {t(`range.${range}`)}
-        </button>
+    <select className="input h-8 w-[76px] px-3 text-xs" value={value} onChange={(event) => onChange(Number(event.target.value))}>
+      {[10, 20, 50].map((size) => (
+        <option key={size} value={size}>
+          {size}
+        </option>
       ))}
-    </div>
+    </select>
   );
 }
 
-export function StatTile({ label, value, tone = "slate" }: { label: string; value: ReactNode; tone?: Tone }) {
+// ----------------------------------------------------------------- misc
+
+export function StatTile({ label, value, tone = "slate", hint }: { label: string; value: ReactNode; tone?: Tone; hint?: ReactNode }) {
   return (
-    <div className="card px-4 py-3.5">
-      <p className="text-xs text-slate-500">{label}</p>
+    <div className="card px-5 py-4">
+      <p className="text-[13px] font-medium text-mute">{label}</p>
       <p
         className={cn(
-          "mt-1 text-xl font-bold tracking-tight text-navy-900",
-          tone === "green" && "text-emerald-600",
+          "mt-1 text-[26px] font-semibold tracking-tight text-ink",
+          tone === "green" && "text-accent-600",
           tone === "red" && "text-rose-600",
           tone === "amber" && "text-amber-500",
-          tone === "blue" && "text-brand-600",
           tone === "violet" && "text-violet-600",
         )}
       >
-        {value}
+        <Figure value={value} />
       </p>
+      {hint && <div className="mt-1 text-xs">{hint}</div>}
     </div>
   );
 }
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="text-right font-medium text-slate-800">{children}</dd>
+    <div className="flex justify-between gap-4 py-2.5 text-[13px]">
+      <dt className="text-mute">{label}</dt>
+      <dd className="text-right font-medium text-ink">{children}</dd>
     </div>
   );
 }

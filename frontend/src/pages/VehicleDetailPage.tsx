@@ -8,6 +8,7 @@ import {
   Card,
   CardHeader,
   Field,
+  PageHeader,
   Pagination,
   PlateNumber,
   QueryView,
@@ -29,13 +30,13 @@ function StatusForm({ vehicle }: { vehicle: VehicleDetail }) {
   const [reason, setReason] = useState(vehicle.status_reason ?? "");
   return (
     <form
-      className="space-y-2 border-t border-slate-100 p-4"
+      className="space-y-2 border-t border-line p-4"
       onSubmit={(event) => {
         event.preventDefault();
         mutation.mutate({ status, reason: reason.trim() || undefined });
       }}
     >
-      <div className="text-sm font-medium text-slate-700">{t("vehicle.changeStatus")}</div>
+      <div className="text-sm font-medium text-ink/80">{t("vehicle.changeStatus")}</div>
       <select className="input" value={status} onChange={(event) => setStatus(event.target.value as VehicleStatus)}>
         {STATUSES.map((value) => (
           <option key={value} value={value}>
@@ -65,21 +66,24 @@ export default function VehicleDetailPage() {
     <QueryView query={vehicle}>
       {(v) => (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link to="/vehicles" className="btn-secondary px-2.5">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="flex-1">
-              <PlateNumber value={v.plate_display} />
-              <p className="mt-1 text-sm text-slate-500">{[v.brand, v.model, v.color].filter(Boolean).join(" · ")}</p>
-            </div>
-            <VehicleStatusBadge status={v.status} />
-          </div>
+          <PageHeader
+            crumbs={[{ label: "Bosh sahifa", to: "/" }, { label: t("nav.vehicles"), to: "/vehicles" }, { label: v.plate_display }]}
+            title={<PlateNumber value={v.plate_display} />}
+            subtitle={[v.brand, v.model, v.color].filter(Boolean).join(" · ") || undefined}
+            actions={
+              <>
+                <VehicleStatusBadge status={v.status} />
+                <Link to="/vehicles" className="btn-secondary">
+                  <ArrowLeft className="h-4 w-4" /> Avtomobillar
+                </Link>
+              </>
+            }
+          />
 
           <div className="grid gap-5 xl:grid-cols-3">
             <Card>
               <CardHeader title="Ma’lumotlar" />
-              <dl className="divide-y divide-slate-100 px-5 pb-3">
+              <dl className="divide-y divide-line px-5 pb-3">
                 <Field label={t("vehicle.type")}>{v.vehicle_type?.name_uz ?? "—"}</Field>
                 <Field label={t("vehicle.detections")}>{v.total_detections}</Field>
                 <Field label={t("vehicle.violations")}>{v.total_violations}</Field>
@@ -103,15 +107,15 @@ export default function VehicleDetailPage() {
             <QueryView query={violations} isEmpty={(data) => data.items.length === 0}>
               {(data) => (
                 <>
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-line">
                     {data.items.map((item) => (
                       <li key={item.id}>
-                        <Link to={`/violations/${item.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50">
-                          <span className="w-40 text-sm text-slate-600">{formatDateTime(item.occurred_at)}</span>
+                        <Link to={`/violations/${item.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-soft">
+                          <span className="w-40 text-sm text-ink/70">{formatDateTime(item.occurred_at)}</span>
                           <span className="flex-1">
                             <TypeChip name={item.type.name_uz} color={item.type.color} />
                           </span>
-                          <span className="font-mono text-xs text-slate-500">{item.camera.code}</span>
+                          <span className="font-mono text-xs text-mute">{item.camera.code}</span>
                           <ViolationStatusBadge status={item.status} />
                         </Link>
                       </li>

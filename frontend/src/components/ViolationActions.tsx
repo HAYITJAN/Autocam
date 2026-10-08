@@ -16,13 +16,19 @@ const ACTION_STYLE: Record<ViolationAction, { className: string; icon: typeof Ch
   reopen: { className: "btn-secondary", icon: RotateCcw },
 };
 
+/** Status transitions the API allows; "comment" is also listed by the API but has its own form. */
+export function workflowActions(violation: ViolationDetail): ViolationAction[] {
+  return violation.allowed_actions.filter((action): action is ViolationAction => action in ACTION_STYLE);
+}
+
 /** Status workflow buttons; only the actions the API allows for this user are shown. */
 export function ViolationActions({ violation, className }: { violation: ViolationDetail; className?: string }) {
   const transition = useViolationTransition(violation.id);
   const [pending, setPending] = useState<ViolationAction | null>(null);
   const [text, setText] = useState("");
 
-  if (violation.allowed_actions.length === 0) return null;
+  const actions = workflowActions(violation);
+  if (actions.length === 0) return null;
 
   const needsText = pending === "reject" || pending === "confirm";
   const run = (action: ViolationAction, comment?: string) =>
@@ -39,7 +45,7 @@ export function ViolationActions({ violation, className }: { violation: Violatio
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex flex-wrap gap-2">
-        {violation.allowed_actions.map((action) => {
+        {actions.map((action) => {
           const { className: style, icon: Icon } = ACTION_STYLE[action];
           return (
             <button
