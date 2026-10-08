@@ -9,9 +9,21 @@ import { formatNumber } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { CameraStatus, HeatPoint, MapCamera, MapDistrict } from "@/lib/types";
 
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
 const TILE_URL = import.meta.env.VITE_MAP_TILE_URL || "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const ATTRIBUTION = import.meta.env.VITE_MAP_ATTRIBUTION || "&copy; OpenStreetMap contributors";
+const SATELLITE_URL = import.meta.env.VITE_MAP_SATELLITE_URL || `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
+const SATELLITE_ATTRIBUTION = import.meta.env.VITE_MAP_SATELLITE_ATTRIBUTION || "Tiles &copy; Esri, Maxar, Earthstar Geographics";
+/** Comma-separated overlay tile URLs (place names, roads) drawn on top of the imagery. */
+const SATELLITE_LABELS = (
+  import.meta.env.VITE_MAP_SATELLITE_LABELS_URL || `${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`
+)
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
 const TASHKENT: [number, number] = [41.3111, 69.2797];
+
+export type Basemap = "street" | "satellite";
 
 export const STATUS_COLORS: Record<CameraStatus, string> = {
   ONLINE: "#5ccb3a",
@@ -38,8 +50,7 @@ interface Props {
   onCameraClick?: (id: number) => void;
   onDistrictClick?: (district: MapDistrict) => void;
   focus?: MapFocus | null;
-  /** Desaturated basemap so status colours and the heat layer stand out. */
-  muted?: boolean;
+  basemap?: Basemap;
   rounded?: boolean;
 }
 
@@ -73,16 +84,27 @@ export function CameraMap({
   onCameraClick,
   onDistrictClick,
   focus,
-  muted = false,
+  basemap = "street",
   rounded = true,
 }: Props) {
   const maxHeat = Math.max(1, ...heat.map((point) => point.weight));
   const maxDistrict = Math.max(1, ...districts.map((district) => district.violations));
+  const satellite = basemap === "satellite";
+  const outline = satellite ? "#ffffff" : "#121212";
 
   return (
     <div className={rounded ? "overflow-hidden rounded-[1.1rem]" : "overflow-hidden"} style={{ height }}>
-      <MapContainer center={TASHKENT} zoom={zoom} scrollWheelZoom zoomControl={false} className="h-full w-full">
-        <TileLayer url={TILE_URL} attribution={ATTRIBUTION} className={muted ? "map-tiles-muted" : undefined} />
+      <MapContainer center={TASHKENT} zoom={zoom} maxZoom={19} scrollWheelZoom zoomControl={false} className="h-full w-full">
+        {satellite ? (
+          <>
+            <TileLayer key="satellite" url={SATELLITE_URL} attribution={SATELLITE_ATTRIBUTION} maxZoom={19} />
+            {SATELLITE_LABELS.map((url) => (
+              <TileLayer key={url} url={url} maxZoom={19} />
+            ))}
+          </>
+        ) : (
+          <TileLayer key="street" url={TILE_URL} attribution={ATTRIBUTION} maxZoom={19} />
+        )}
         <ZoomControl position="bottomright" />
         <FlyTo focus={focus} />
         <AutoResize />
@@ -92,7 +114,7 @@ export function CameraMap({
             key={`d-${district.id}`}
             center={[district.center_lat, district.center_lng]}
             radius={14 + (district.violations / maxDistrict) * 26}
-            pathOptions={{ color: "#121212", weight: 1, dashArray: "4 4", fillColor: "#121212", fillOpacity: 0.06 }}
+            pathOptions={{ color: outline, weight: satellite ? 1.5 : 1, dashArray: "4 4", fillColor: outline, fillOpacity: satellite ? 0.12 : 0.06 }}
             eventHandlers={onDistrictClick ? { click: () => onDistrictClick(district) } : undefined}
           >
             <Tooltip direction="top">
@@ -108,7 +130,7 @@ export function CameraMap({
             key={`h-${point.latitude}-${point.longitude}`}
             center={[point.latitude, point.longitude]}
             radius={6 + (point.weight / maxHeat) * 22}
-            pathOptions={{ stroke: false, color: "#f43f5e", fillOpacity: 0.15 + (point.weight / maxHeat) * 0.45 }}
+            pathOptions={{ stroke: false, color: "#f43f5e", fillOpacity: (satellite ? 0.25 : 0.15) + (point.weight / maxHeat) * 0.45 }}
             interactive={false}
           />
         ))}
@@ -121,7 +143,7 @@ export function CameraMap({
               center={[camera.latitude, camera.longitude]}
               radius={active ? 11 : 7}
               pathOptions={{
-                color: active ? "#121212" : "#fff",
+                color: active ? outline : "#fff",
                 weight: active ? 3 : 2,
                 fillColor: STATUS_COLORS[camera.status],
                 fillOpacity: 1,

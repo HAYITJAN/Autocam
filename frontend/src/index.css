@@ -152,10 +152,6 @@
   border-radius: 1.1rem;
 }
 
-.map-tiles-muted {
-  filter: grayscale(1) brightness(1.06) contrast(0.88);
-}
-
 .leaflet-bar {
   border: 1px solid #ececea !important;
   border-radius: 9999px !important;

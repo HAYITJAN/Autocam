@@ -1,9 +1,9 @@
-import { ArrowLeft, ArrowRight, Camera, Flame, Layers, MapPin, Search, ShieldAlert, TriangleAlert, Video, X } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, Camera, Flame, Layers, Map as MapIcon, MapPin, Satellite, Search, ShieldAlert, TriangleAlert, Video, X } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { useCamera, useHeatmap, useKpis, useMapCameras, useMapDistricts } from "@/api/queries";
-import { CameraMap, STATUS_COLORS, type MapFocus } from "@/components/CameraMap";
+import { CameraMap, STATUS_COLORS, type Basemap, type MapFocus } from "@/components/CameraMap";
 import { CameraPreview } from "@/components/CameraPreview";
 import { CameraStatusBadge, DeltaChip, Field, PageHeader, QueryView } from "@/components/ui";
 import { cn, daysAgoInput, formatDateTime, formatNumber, formatTime, toIsoEnd, toIsoStart } from "@/lib/format";
@@ -26,6 +26,19 @@ const STATUSES: CameraStatus[] = ["ONLINE", "WARNING", "OFFLINE", "MAINTENANCE"]
 const CAMERA_TYPES: Record<CameraType, string> = { FIXED: "Statsionar", PTZ: "PTZ", ANPR: "Raqam aniqlovchi (ANPR)", SPEED: "Tezlik kamerasi" };
 const CONNECTIONS: Record<string, string> = { WIFI: "Wi-Fi", LTE_4G: "4G LTE", ETHERNET: "Ethernet" };
 const FLOATING = "rounded-2xl border border-black/[0.06] bg-white/95 shadow-[0_12px_32px_-14px_rgba(18,18,18,0.3)] backdrop-blur";
+const BASEMAPS: { value: Basemap; label: string; icon: typeof Camera }[] = [
+  { value: "street", label: "Xarita", icon: MapIcon },
+  { value: "satellite", label: "Sputnik", icon: Satellite },
+];
+const BASEMAP_KEY = "map.basemap";
+
+function storedBasemap(): Basemap {
+  try {
+    return localStorage.getItem(BASEMAP_KEY) === "satellite" ? "satellite" : "street";
+  } catch {
+    return "street";
+  }
+}
 
 function toggleIn<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set);
@@ -157,6 +170,32 @@ function LayerPanel({
           </ul>
         </>
       )}
+    </div>
+  );
+}
+
+function BasemapSwitch({ value, onChange }: { value: Basemap; onChange: (value: Basemap) => void }) {
+  return (
+    <div className={cn(FLOATING, "flex gap-1 p-1")} role="radiogroup" aria-label="Xarita turi">
+      {BASEMAPS.map((item) => {
+        const on = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(item.value)}
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 rounded-xl px-3 text-xs font-medium transition",
+              on ? "bg-ink text-white" : "text-ink/70 hover:bg-soft hover:text-ink",
+            )}
+          >
+            <item.icon className="h-3.5 w-3.5" />
+            {item.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -341,6 +380,14 @@ export default function MapPage() {
   const [days, setDays] = useState(7);
   const [selected, setSelected] = useState<number | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
+  const [basemap, setBasemap] = useState<Basemap>(storedBasemap);
+  useEffect(() => {
+    try {
+      localStorage.setItem(BASEMAP_KEY, basemap);
+    } catch {
+      // storage unavailable (private mode); the choice just isn't remembered
+    }
+  }, [basemap]);
   const period = useMemo(() => ({ date_from: toIsoStart(daysAgoInput(days - 1)), date_to: toIsoEnd(daysAgoInput(0)) }), [days]);
 
   const cameras = useMapCameras();
@@ -388,7 +435,7 @@ export default function MapPage() {
             districts={layers.has("districts") ? districts.data : []}
             height="100%"
             zoom={12}
-            muted
+            basemap={basemap}
             rounded={false}
             selectedId={selected}
             focus={focus}
@@ -410,12 +457,11 @@ export default function MapPage() {
                 <CameraSearch cameras={allCameras} onPick={pickCamera} />
               </div>
             </div>
-            <div className="flex items-end">
-              {layers.has("heatmap") && (
-                <div className="pointer-events-auto">
-                  <HeatLegend days={days} />
-                </div>
-              )}
+            <div className="flex items-end justify-between gap-3">
+              <div className="pointer-events-auto">{layers.has("heatmap") && <HeatLegend days={days} />}</div>
+              <div className="pointer-events-auto mr-12">
+                <BasemapSwitch value={basemap} onChange={setBasemap} />
+              </div>
             </div>
           </div>
         </div>
