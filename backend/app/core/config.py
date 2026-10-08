@@ -1,12 +1,32 @@
+import os
 from enum import StrEnum
 from functools import lru_cache
 from typing import Self
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 INSECURE_SECRET_MARKER = "change-me"  # noqa: S105
 MIN_SECRET_LENGTH = 32
+ASYNCPG_SCHEME = "postgresql+asyncpg"
+
+
+def normalize_database_url(url: str) -> str:
+    """Turn provider URLs (`postgres://…?sslmode=require`) into asyncpg URLs.
+
+    Hosted Postgres (Neon, Supabase, Vercel) hands out libpq-style URLs; asyncpg
+    takes `ssl` instead of `sslmode` and rejects libpq-only `channel_binding`.
+    """
+    parts = urlsplit(url)
+    if parts.scheme not in ("postgres", "postgresql", ASYNCPG_SCHEME):
+        return url
+    query = [
+        ("ssl" if key == "sslmode" else key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key != "channel_binding"
+    ]
+    return urlunsplit((ASYNCPG_SCHEME, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 class Environment(StrEnum):
@@ -42,6 +62,8 @@ class Settings(BaseSettings):
     database_pool_size: int = Field(default=10, ge=1, le=100)
     database_max_overflow: int = Field(default=20, ge=0, le=200)
     database_echo: bool = False
+    # Short-lived serverless instances must not keep a connection pool; on by itself on Vercel.
+    serverless: bool = False
 
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
@@ -80,6 +102,17 @@ class Settings(BaseSettings):
     websocket_url: str = "ws://localhost/api/v1/ws"
 
     health_check_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+
+    @field_validator("database_url")
+    @classmethod
+    def _asyncpg_database_url(cls, value: str) -> str:
+        return normalize_database_url(value)
+
+    @model_validator(mode="after")
+    def _detect_serverless(self) -> Self:
+        if os.environ.get("VERCEL"):
+            self.serverless = True
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

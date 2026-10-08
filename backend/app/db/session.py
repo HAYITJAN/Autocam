@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 
@@ -14,6 +15,14 @@ from app.core.config import get_settings
 @lru_cache
 def get_engine() -> AsyncEngine:
     settings = get_settings()
+    connect_args = {"server_settings": {"application_name": "smart-traffic-backend"}}
+    if settings.serverless:
+        return create_async_engine(
+            settings.database_url,
+            poolclass=NullPool,
+            echo=settings.database_echo,
+            connect_args=connect_args,
+        )
     return create_async_engine(
         settings.database_url,
         pool_size=settings.database_pool_size,
@@ -21,7 +30,7 @@ def get_engine() -> AsyncEngine:
         pool_pre_ping=True,
         pool_recycle=1800,
         echo=settings.database_echo,
-        connect_args={"server_settings": {"application_name": "smart-traffic-backend"}},
+        connect_args=connect_args,
     )
 
 

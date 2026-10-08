@@ -1,0 +1,15 @@
+.scratch
+.env
+.env.*
+!.env.example
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+backend/.venv
+backend/storage_data
+frontend/dist
+ai-service
+docs
+docker

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Environment, Settings
+from app.core.config import Environment, Settings, normalize_database_url
 
 STRONG = "x" * 48
 
@@ -63,3 +63,26 @@ def test_cors_origins_are_split_and_trimmed() -> None:
     )
 
     assert settings.cors_origin_list == ["http://a.uz", "http://b.uz"]
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        (
+            "postgres://u:p@ep-x.eu-central-1.aws.neon.tech/db?sslmode=require&channel_binding=require",
+            "postgresql+asyncpg://u:p@ep-x.eu-central-1.aws.neon.tech/db?ssl=require",
+        ),
+        ("postgresql://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
+        ("postgresql+asyncpg://u@h/db?ssl=require", "postgresql+asyncpg://u@h/db?ssl=require"),
+        ("sqlite+aiosqlite:///x.db", "sqlite+aiosqlite:///x.db"),
+    ],
+)
+def test_database_url_is_normalized_for_asyncpg(url: str, expected: str) -> None:
+    assert normalize_database_url(url) == expected
+
+
+def test_vercel_environment_enables_serverless_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    settings = Settings(jwt_secret=STRONG, ai_service_token=STRONG, _env_file=None)  # type: ignore[arg-type]
+
+    assert settings.serverless

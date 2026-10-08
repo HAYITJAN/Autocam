@@ -24,6 +24,9 @@ coverage/
 # Local scratch area
 /.scratch/
 
+# Vercel CLI project link
+.vercel/
+
 # Runtime data
 /data/
 /storage/
