@@ -1,0 +1,43 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Runtime data
+/data/
+/storage/
+backend/storage_data/
+ai-service/models/*
+!ai-service/models/.gitkeep
+ai-service/samples/*
+!ai-service/samples/.gitkeep
+ai-service/outbox/
+
+# Logs
+*.log
+/logs/
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

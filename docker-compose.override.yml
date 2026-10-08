@@ -1,0 +1,26 @@
+# Development overrides, applied automatically by `docker compose up`.
+# Production: docker compose -f docker-compose.yml up -d
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--no-access-log"]
+    volumes:
+      - ./backend/app:/app/app
+      - evidence_storage:/data/storage
+    ports:
+      - "8000:8000"
+
+  ai-service:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+    volumes:
+      - ./ai-service/app:/app/app
+      - ai_outbox:/app/outbox
+    ports:
+      - "8001:8001"
