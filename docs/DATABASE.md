@@ -145,6 +145,8 @@ erDiagram
         bigint ai_model_id FK
         int speed_limit_kmh
         numeric road_direction_deg
+        numeric latitude "mounting point, NULL = location"
+        numeric longitude
         jsonb ai_config
         timestamptz last_heartbeat_at
         timestamptz deleted_at
