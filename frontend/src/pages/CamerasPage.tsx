@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useCamera, useCameraEvents, useCameras, useCameraStatistics, useCameraSummary, useDistricts, useMapCameras } from "@/api/queries";
 import { CameraMap } from "@/components/CameraMap";
 import { CameraPreview } from "@/components/CameraPreview";
+import { Select } from "@/components/Select";
 import {
   CameraStatusBadge,
   CountTabs,
@@ -244,22 +245,22 @@ export default function CamerasPage() {
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-mute" />
           <input className="input pl-9" placeholder={t("common.search")} value={search} onChange={(event) => reset(setSearch)(event.target.value)} />
         </div>
-        <select className="input w-48" value={districtId} onChange={(event) => reset(setDistrictId)(event.target.value)}>
-          <option value="">Barcha hududlar</option>
-          {districts.data?.map((district) => (
-            <option key={district.id} value={district.id}>
-              {district.name}
-            </option>
-          ))}
-        </select>
-        <select className="input w-48" value={cameraType} onChange={(event) => reset(setCameraType)(event.target.value)}>
-          <option value="">Barcha turlar</option>
-          {(Object.keys(CAMERA_TYPES) as CameraType[]).map((type) => (
-            <option key={type} value={type}>
-              {CAMERA_TYPES[type]}
-            </option>
-          ))}
-        </select>
+        <Select
+          className="w-52"
+          icon={MapPin}
+          value={districtId}
+          onChange={reset(setDistrictId)}
+          placeholder="Barcha tumanlar"
+          options={(districts.data ?? []).map((district) => ({ value: String(district.id), label: district.name }))}
+        />
+        <Select
+          className="w-56"
+          icon={Camera}
+          value={cameraType}
+          onChange={reset(setCameraType)}
+          placeholder="Barcha kamera turlari"
+          options={(Object.keys(CAMERA_TYPES) as CameraType[]).map((type) => ({ value: type, label: CAMERA_TYPES[type] }))}
+        />
       </div>
 
       <div className={cn("grid gap-5", panelOpen && "xl:grid-cols-[1fr_380px]")}>

@@ -1,9 +1,10 @@
-import { Activity, ArrowRight, Car, Eye, Search, TriangleAlert } from "lucide-react";
+import { Activity, ArrowDownUp, ArrowRight, Car, Eye, Search, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useTop, useVehicle, useVehicles, useVehicleStatus, useVehicleSummary, useVehicleTypes, useVehicleViolations } from "@/api/queries";
 import { CameraPreview } from "@/components/CameraPreview";
+import { Select } from "@/components/Select";
 import { DonutChart, HorizontalBars } from "@/components/charts";
 import {
   Badge,
@@ -21,7 +22,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { cn, daysAgoInput, formatDateTime, formatNumber, formatRelative, toIsoEnd, toIsoStart } from "@/lib/format";
 import { t } from "@/lib/i18n";
-import { categoryColor } from "@/lib/palette";
+import { categoryColor, VEHICLE_STATUS_COLORS } from "@/lib/palette";
 import type { VehicleDetail, VehicleListItem, VehicleStatus } from "@/lib/types";
 import { useHasPermission } from "@/stores/auth";
 
@@ -49,13 +50,13 @@ function StatusForm({ vehicle }: { vehicle: VehicleDetail }) {
     >
       <div className="text-sm font-semibold text-ink/80">{t("vehicle.changeStatus")}</div>
       <div className="flex gap-2">
-        <select className="input" value={status} onChange={(event) => setStatus(event.target.value as VehicleStatus)}>
-          {STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {t(`vehicle.status.${value}`)}
-            </option>
-          ))}
-        </select>
+        <Select
+          className="flex-1"
+          aria-label={t("vehicle.changeStatus")}
+          value={status}
+          onChange={(value) => setStatus(value as VehicleStatus)}
+          options={STATUSES.map((value) => ({ value, label: t(`vehicle.status.${value}`), color: VEHICLE_STATUS_COLORS[value] }))}
+        />
         <button type="submit" className="btn-primary" disabled={mutation.isPending}>
           {t("common.save")}
         </button>
@@ -210,20 +211,27 @@ export default function VehiclesPage() {
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-mute" />
           <input className="input pl-9" placeholder="Davlat raqami, marka…" value={search} onChange={(event) => reset(setSearch)(event.target.value)} />
         </div>
-        <select className="input w-44" value={vehicleType} onChange={(event) => reset(setVehicleType)(event.target.value)}>
-          <option value="">Avtomobil turi</option>
-          {types.data?.map((type) => (
-            <option key={type.code} value={type.code}>
-              {type.name_uz}
-            </option>
-          ))}
-        </select>
-        <select className="input w-48" value={sort} onChange={(event) => setSort(event.target.value)}>
-          <option value="-last_seen_at">Oxirgi ko‘rilgan</option>
-          <option value="-total_violations">Qoidabuzarliklar soni</option>
-          <option value="-total_detections">Ko‘rishlar soni</option>
-          <option value="plate_number">Davlat raqami</option>
-        </select>
+        <Select
+          className="w-48"
+          icon={Car}
+          value={vehicleType}
+          onChange={reset(setVehicleType)}
+          placeholder="Barcha turlar"
+          options={(types.data ?? []).map((type) => ({ value: type.code, label: type.name_uz, color: categoryColor(type.code, null) }))}
+        />
+        <Select
+          className="w-56"
+          icon={ArrowDownUp}
+          aria-label="Saralash"
+          value={sort}
+          onChange={setSort}
+          options={[
+            { value: "-last_seen_at", label: "Oxirgi ko‘rilgan" },
+            { value: "-total_violations", label: "Qoidabuzarliklar soni" },
+            { value: "-total_detections", label: "Ko‘rishlar soni" },
+            { value: "plate_number", label: "Davlat raqami" },
+          ]}
+        />
       </div>
 
       <div className={cn("grid gap-5", selected !== null && "xl:grid-cols-[1fr_380px]")}>

@@ -2,8 +2,10 @@ import { CalendarDays, RotateCcw, Search, SlidersHorizontal } from "lucide-react
 import { useEffect, useState } from "react";
 
 import { useCameraOptions, useDistricts, useViolationTypes } from "@/api/queries";
+import { Select } from "@/components/Select";
 import { cn } from "@/lib/format";
 import { tDynamic } from "@/lib/i18n";
+import { categoryColor } from "@/lib/palette";
 
 import { CONFIDENCE_LEVELS, DIRECTIONS, PERIODS, STATUSES, type FilterKey, type ViolationFiltersState } from "./filters";
 
@@ -37,31 +39,6 @@ function CommitInput({
       {icon && <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-mute" />}
       <input className={cn("input", icon && "pl-9")} placeholder={placeholder} value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit} />
     </form>
-  );
-}
-
-function Select({
-  value,
-  onChange,
-  placeholder,
-  options,
-  className,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  options: { value: string; label: string }[];
-  className?: string;
-}) {
-  return (
-    <select className={cn("input", value && "border-ink/40 font-medium text-ink", className)} value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">{placeholder}</option>
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -126,7 +103,7 @@ export function FilterBar({ filters, hide = [] }: { filters: ViolationFiltersSta
             value={get("type")}
             onChange={(value) => set({ type: value })}
             placeholder="Barcha turlar"
-            options={(types.data ?? []).map((type) => ({ value: type.code, label: type.name_uz }))}
+            options={(types.data ?? []).map((type) => ({ value: type.code, label: type.name_uz, color: categoryColor(type.code, type.color) }))}
           />
         )}
         {shown("camera") && (
@@ -135,7 +112,8 @@ export function FilterBar({ filters, hide = [] }: { filters: ViolationFiltersSta
             value={get("camera")}
             onChange={(value) => set({ camera: value })}
             placeholder="Barcha kameralar"
-            options={(cameras.data?.items ?? []).map((camera) => ({ value: String(camera.id), label: `${camera.code} · ${camera.name}` }))}
+            menuClassName="min-w-80"
+            options={(cameras.data?.items ?? []).map((camera) => ({ value: String(camera.id), label: camera.name, hint: camera.code }))}
           />
         )}
         {shown("district") && (

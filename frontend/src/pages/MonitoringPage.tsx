@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { useCameras, useCameraSummary, useDistricts, useKpis, useRecentViolations, useViolationsTimeseries } from "@/api/queries";
 import { CameraPreview } from "@/components/CameraPreview";
+import { Select } from "@/components/Select";
 import { Sparkline, VolumeBars } from "@/components/charts";
 import {
   Card,
@@ -245,14 +246,14 @@ function CameraWall({ summary }: { summary: CameraSummary | undefined }) {
             <Search className="pointer-events-none absolute left-3.5 top-3 h-4 w-4 text-mute" />
             <input className="input pl-9" placeholder="Kod yoki manzil…" value={search} onChange={(event) => reset(setSearch)(event.target.value)} />
           </div>
-          <select className="input w-44" value={districtId} onChange={(event) => reset(setDistrictId)(event.target.value)}>
-            <option value="">Barcha tumanlar</option>
-            {districts.data?.map((district) => (
-              <option key={district.id} value={district.id}>
-                {district.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            className="w-48"
+            icon={MapPin}
+            value={districtId}
+            onChange={reset(setDistrictId)}
+            placeholder="Barcha tumanlar"
+            options={(districts.data ?? []).map((district) => ({ value: String(district.id), label: district.name }))}
+          />
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useVehicle, useVehicleStatus, useVehicleViolations } from "@/api/queries";
 import { DonutChart } from "@/components/charts";
+import { Select } from "@/components/Select";
 import {
   Card,
   CardHeader,
@@ -22,7 +23,7 @@ import { ConfidenceMeter } from "@/components/violations/parts";
 import { ApiError } from "@/lib/api";
 import { cn, formatClock, formatDate, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { t } from "@/lib/i18n";
-import { categoryColor } from "@/lib/palette";
+import { categoryColor, VEHICLE_STATUS_COLORS } from "@/lib/palette";
 import type { VehicleDetail, VehicleStatus, ViolationListItem } from "@/lib/types";
 import { useHasPermission } from "@/stores/auth";
 
@@ -41,13 +42,12 @@ function StatusForm({ vehicle }: { vehicle: VehicleDetail }) {
       }}
     >
       <div className="text-sm font-medium text-ink/80">{t("vehicle.changeStatus")}</div>
-      <select className="input" value={status} onChange={(event) => setStatus(event.target.value as VehicleStatus)}>
-        {STATUSES.map((value) => (
-          <option key={value} value={value}>
-            {t(`vehicle.status.${value}`)}
-          </option>
-        ))}
-      </select>
+      <Select
+        aria-label={t("vehicle.changeStatus")}
+        value={status}
+        onChange={(value) => setStatus(value as VehicleStatus)}
+        options={STATUSES.map((value) => ({ value, label: t(`vehicle.status.${value}`), color: VEHICLE_STATUS_COLORS[value] }))}
+      />
       <input className="input" placeholder={t("vehicle.reason")} value={reason} onChange={(event) => setReason(event.target.value)} />
       <button type="submit" className="btn-primary w-full" disabled={mutation.isPending}>
         {t("common.save")}

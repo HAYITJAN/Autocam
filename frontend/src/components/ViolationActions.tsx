@@ -70,7 +70,7 @@ export function ViolationActions({ violation, className }: { violation: Violatio
           }}
         >
           <textarea
-            className="input min-h-20"
+            className="input h-auto min-h-24 resize-none rounded-2xl py-2.5 leading-relaxed"
             placeholder={pending === "reject" ? t("violation.rejectReason") : `${t("violation.comment")} (ixtiyoriy)`}
             required={pending === "reject"}
             minLength={pending === "reject" ? 3 : undefined}

@@ -1,10 +1,11 @@
-import { ArrowRight, Camera, CheckCircle2, Gauge, ShieldAlert, Timer, TriangleAlert, XCircle } from "lucide-react";
+import { ArrowRight, CalendarDays, Camera, CheckCircle2, Gauge, ShieldAlert, Timer, TriangleAlert, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useCamera, useCameraSummary, useHeatmap, useKpis, useMapCameras, useMapDistricts } from "@/api/queries";
 import { CameraMap, STATUS_COLORS } from "@/components/CameraMap";
 import { CameraPreview } from "@/components/CameraPreview";
+import { Select } from "@/components/Select";
 import { Card, CardHeader, CameraStatusBadge, Field, KpiTile, PageHeader, QueryView, SidePanel } from "@/components/ui";
 import { cn, daysAgoInput, formatDateTime, formatNumber, formatPct, toIsoEnd, toIsoStart } from "@/lib/format";
 import { t } from "@/lib/i18n";
@@ -134,16 +135,23 @@ export default function MapPage() {
                 ] as [Layer, string][]
               ).map(([layer, label]) => (
                 <label key={layer} className="flex cursor-pointer items-center gap-2 text-ink/80">
-                  <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={layers.has(layer)} onChange={() => toggle(layer)} />
+                  <input type="checkbox" className="h-4 w-4 rounded accent-ink" checked={layers.has(layer)} onChange={() => toggle(layer)} />
                   {label}
                 </label>
               ))}
             </div>
-            <select className="input py-1.5 text-xs" value={days} onChange={(event) => setDays(Number(event.target.value))}>
-              <option value={1}>So‘nggi 24 soat</option>
-              <option value={7}>So‘nggi 7 kun</option>
-              <option value={30}>So‘nggi 30 kun</option>
-            </select>
+            <Select
+              size="sm"
+              icon={CalendarDays}
+              aria-label="Davr"
+              value={String(days)}
+              onChange={(value) => setDays(Number(value))}
+              options={[
+                { value: "1", label: "So‘nggi 24 soat" },
+                { value: "7", label: "So‘nggi 7 kun" },
+                { value: "30", label: "So‘nggi 30 kun" },
+              ]}
+            />
           </div>
           {layers.has("heatmap") && (
             <div className="absolute bottom-5 right-5 z-10 w-48 rounded-xl border border-line bg-white/95 p-2.5 text-xs shadow-lg">

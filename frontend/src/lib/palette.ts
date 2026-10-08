@@ -22,6 +22,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   OTHER: "#a8a8a3",
 };
 
+export const VEHICLE_STATUS_COLORS: Record<string, string> = { NORMAL: "#a8a8a3", WATCHLIST: "#f5b740", BLACKLIST: "#f0566a" };
+
 const FALLBACK_COLORS = ["#121212", "#6fd14a", "#f5b740", "#f0566a", "#8b7cf6", "#4fb0e6", "#e98a4f", "#a8a8a3"];
 
 export function categoryColor(code: string | null | undefined, apiColor?: string | null, index = 0): string {

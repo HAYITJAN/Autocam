@@ -16,6 +16,7 @@ import {
 import { Fragment, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { Select } from "@/components/Select";
 import { ApiError } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/format";
 import { t, tDynamic } from "@/lib/i18n";
@@ -488,13 +489,14 @@ export function Pagination({ meta, onPage, extra }: { meta: PageMeta; onPage: (p
 
 export function PageSizeSelect({ value, onChange }: { value: number; onChange: (size: number) => void }) {
   return (
-    <select className="input h-8 w-[76px] px-3 text-xs" value={value} onChange={(event) => onChange(Number(event.target.value))}>
-      {[10, 20, 50].map((size) => (
-        <option key={size} value={size}>
-          {size}
-        </option>
-      ))}
-    </select>
+    <Select
+      size="sm"
+      className="w-[84px]"
+      aria-label="Sahifadagi qatorlar"
+      value={String(value)}
+      onChange={(next) => onChange(Number(next))}
+      options={[10, 20, 50, 100].map((size) => ({ value: String(size), label: String(size) }))}
+    />
   );
 }
 

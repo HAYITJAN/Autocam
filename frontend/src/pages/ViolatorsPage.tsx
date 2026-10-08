@@ -1,6 +1,8 @@
+import { ArrowDownUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { useViolators } from "@/api/queries";
+import { Select } from "@/components/Select";
 import { CardHeader, PageHeader, Pagination, PageSizeSelect, PlateNumber, QueryView, VehicleStatusBadge } from "@/components/ui";
 import { FilterBar } from "@/components/violations/FilterBar";
 import { useViolationFilters } from "@/components/violations/filters";
@@ -50,13 +52,14 @@ export default function ViolatorsPage() {
                   Takroriy (2+)
                 </button>
               </div>
-              <select className="input h-9 w-48 text-xs" value={sort} onChange={(event) => set({ vsort: event.target.value === "-violations" ? null : event.target.value })}>
-                {SORTS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                className="w-52"
+                icon={ArrowDownUp}
+                aria-label="Saralash"
+                value={sort}
+                onChange={(value) => set({ vsort: value === "-violations" ? null : value })}
+                options={SORTS}
+              />
             </div>
           }
         />
