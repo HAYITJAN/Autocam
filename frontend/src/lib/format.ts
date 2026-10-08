@@ -29,6 +29,26 @@ const timeFormat = new Intl.DateTimeFormat("ru-RU", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const fullDateFormat = new Intl.DateTimeFormat("ru-RU", {
+  timeZone: DISPLAY_TZ,
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+const preciseTimeFormat = new Intl.DateTimeFormat("ru-RU", {
+  timeZone: DISPLAY_TZ,
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+export function formatDate(iso: string | null | undefined): string {
+  return iso ? fullDateFormat.format(new Date(iso)) : "—";
+}
+
+export function formatClock(iso: string | null | undefined): string {
+  return iso ? preciseTimeFormat.format(new Date(iso)) : "—";
+}
 
 export function formatNumber(value: number | null | undefined): string {
   return value === null || value === undefined ? "—" : numberFormat.format(value);
@@ -74,8 +94,11 @@ export function toIsoEnd(date: string): string {
   return new Date(`${date}T23:59:59`).toISOString();
 }
 
+/** `YYYY-MM-DD` of the browser-local day `days` ago (value format of `<input type="date">`). */
 export function daysAgoInput(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }

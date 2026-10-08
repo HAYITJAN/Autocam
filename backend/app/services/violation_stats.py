@@ -64,7 +64,9 @@ class ViolationStatsService:
 
     # ---------------------------------------------------------------- overview
 
-    async def statistics(self, filters: ViolationFilters) -> ViolationStatistics:
+    async def statistics(
+        self, filters: ViolationFilters, camera_limit: int = TOP_CAMERAS
+    ) -> ViolationStatistics:
         start, end = _bounds(filters)
         total, unrecognized, avg_conf = (
             await self.session.execute(
@@ -92,7 +94,7 @@ class ViolationStatsService:
             violation_rate_pct=round(total / total_vehicles * 100, 3) if total_vehicles else None,
             by_status=await self._by_status(filters),
             by_type=await self._type_stats(filters),
-            by_camera=await self._by_camera(filters),
+            by_camera=await self._by_camera(filters, camera_limit),
             by_hour=await self._by_hour(filters),
             series=await self._series(filters, start, end),
         )
@@ -111,7 +113,10 @@ class ViolationStatsService:
             raise NotFoundError("Violation type")
         scoped = replace(filters, violation_type=[code])
         start, end = _bounds(scoped)
-        stat = next(t for t in await self._type_stats(scoped, include_all=True) if t.code == code)
+        # `pct` is the share among all types under the remaining filters.
+        unscoped = replace(filters, violation_type=None)
+        all_types = await self._type_stats(unscoped, include_all=True)
+        stat = next(t for t in all_types if t.code == code)
         return ViolationTypeDetail(
             type=stat,
             by_status=await self._by_status(scoped),
@@ -351,7 +356,9 @@ class ViolationStatsService:
         rows: dict[ViolationStatus, int] = dict(result.all())
         return [StatusCount(status=s, count=rows.get(s, 0)) for s in ViolationStatus]
 
-    async def _by_camera(self, filters: ViolationFilters) -> list[CameraStat]:
+    async def _by_camera(
+        self, filters: ViolationFilters, limit: int = TOP_CAMERAS
+    ) -> list[CameraStat]:
         rows = await self.session.execute(
             filters.apply(
                 violation_scope(
@@ -365,7 +372,7 @@ class ViolationStatsService:
             )
             .group_by(Camera.id, Camera.code, Camera.name, District.name)
             .order_by(func.count(Violation.id).desc(), Camera.id)
-            .limit(TOP_CAMERAS)
+            .limit(limit)
         )
         return [
             CameraStat(

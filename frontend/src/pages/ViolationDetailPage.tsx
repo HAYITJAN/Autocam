@@ -1,24 +1,19 @@
-import { ArrowLeft, ImageOff } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, ArrowRight, Car } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { useViolation, useViolationComment } from "@/api/queries";
-import { CameraPreview } from "@/components/CameraPreview";
+import { useVehicleViolations, useViolation, useViolationComment } from "@/api/queries";
 import { ViolationActions, workflowActions } from "@/components/ViolationActions";
-import {
-  Card,
-  CardHeader,
-  Field,
-  PageHeader,
-  PlateNumber,
-  QueryView,
-  SeverityBadge,
-  TypeChip,
-  VehicleStatusBadge,
-  ViolationStatusBadge,
-} from "@/components/ui";
-import { formatConfidence, formatDateTime } from "@/lib/format";
+import { Card, CardHeader, Field, PageHeader, PlateNumber, QueryView, SeverityBadge, TypeChip, ViolationStatusBadge } from "@/components/ui";
+import { useEvidenceRefresh, VehicleFields } from "@/components/violations/EventDrawer";
+import { EvidenceGallery } from "@/components/violations/EvidenceGallery";
+import { directionLabel } from "@/components/violations/filters";
+import { ColorDot, ConfidenceMeter, TypeIcon, vehicleName } from "@/components/violations/parts";
+import { cn, formatClock, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import { t, tDynamic } from "@/lib/i18n";
+import type { TrafficLightState, ViolationDetail } from "@/lib/types";
+
+const LIGHT_LABELS: Record<TrafficLightState, string> = { RED: "Qizil", YELLOW: "Sariq", GREEN: "Yashil", UNKNOWN: "Noma’lum" };
 
 function CommentBox({ id }: { id: number }) {
   const comment = useViolationComment(id);
@@ -39,20 +34,110 @@ function CommentBox({ id }: { id: number }) {
   );
 }
 
+function Fact({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("min-w-0 bg-white px-5 py-4", className)}>
+      <dt className="text-[11px] font-semibold uppercase tracking-wider text-mute">{label}</dt>
+      <dd className="mt-1.5 text-[14px] font-medium text-ink">{children}</dd>
+    </div>
+  );
+}
+
+/** The eight facts an operator needs first, in a fixed order. */
+function KeyFacts({ v }: { v: ViolationDetail }) {
+  const vehicle = v.vehicle;
+  return (
+    <Card className="overflow-hidden">
+      <dl className="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-4">
+        <Fact label="Qoidabuzarlik">
+          <TypeChip name={v.type.name_uz} code={v.type.code} color={v.type.color} />
+        </Fact>
+        <Fact label="Avtomobil">
+          <div className="flex flex-wrap items-center gap-2">
+            <PlateNumber value={vehicle?.plate_display ?? v.plate_number} />
+            <span className="inline-flex items-center gap-1.5 text-[13px]">
+              <ColorDot color={vehicle?.color} />
+              {vehicle ? vehicleName(vehicle) : "—"}
+              {vehicle?.color && <span className="text-mute">· {vehicle.color}</span>}
+            </span>
+          </div>
+        </Fact>
+        <Fact label="Vaqt">
+          {formatDate(v.occurred_at)} <span className="tabular-nums text-ink/70">{formatClock(v.occurred_at)}</span>
+        </Fact>
+        <Fact label="Kamera">
+          <Link to={`/cameras/${v.camera.id}`} className="hover:underline">
+            <span className="font-mono text-[13px]">{v.camera.code}</span>
+          </Link>
+          <span className="block truncate text-xs font-normal text-mute">{v.camera.name}</span>
+        </Fact>
+        <Fact label="Manzil">
+          <span className="line-clamp-2">{v.address ?? v.location?.name ?? "—"}</span>
+          {v.location && <span className="block text-xs font-normal text-mute">{v.location.district.name}</span>}
+        </Fact>
+        <Fact label="Yo‘nalish">{directionLabel(v.direction)}</Fact>
+        <Fact label="AI aniqlik">
+          <ConfidenceMeter value={v.ai_confidence} />
+        </Fact>
+        <Fact label="Status">
+          <ViolationStatusBadge status={v.status} />
+        </Fact>
+      </dl>
+    </Card>
+  );
+}
+
+function VehicleHistory({ vehicleId, currentId }: { vehicleId: number; currentId: number }) {
+  const query = useVehicleViolations(vehicleId, 1, 6);
+  return (
+    <QueryView query={query}>
+      {(data) => (
+        <ul className="divide-y divide-line">
+          {data.items.map((item) => (
+            <li key={item.id}>
+              <Link
+                to={`/violations/${item.id}`}
+                className={cn("flex items-center gap-3 px-5 py-2.5 text-[13px] transition hover:bg-soft", item.id === currentId && "bg-accent-50")}
+              >
+                <span className="flex-1">
+                  <TypeChip name={item.type.name_uz} code={item.type.code} color={item.type.color} />
+                </span>
+                <span className="text-xs text-mute">{formatDateTime(item.occurred_at)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </QueryView>
+  );
+}
+
 export default function ViolationDetailPage() {
   const id = Number(useParams().id);
   const query = useViolation(id);
+  const refreshEvidence = useEvidenceRefresh(query.refetch);
 
   return (
     <QueryView query={query}>
       {(v) => (
         <div className="space-y-5">
           <PageHeader
-            crumbs={[{ label: "Bosh sahifa", to: "/" }, { label: t("nav.violations"), to: "/violations" }, { label: v.code }]}
-            title={<span className="font-mono">{v.code}</span>}
-            subtitle={`${v.type.name_uz} · ${formatDateTime(v.occurred_at)}`}
+            crumbs={[
+              { label: "Bosh sahifa", to: "/" },
+              { label: "Qoidabuzarliklar", to: "/violations" },
+              { label: v.type.name_uz, to: `/violations/types/${v.type.code}` },
+              { label: v.code },
+            ]}
+            title={
+              <span className="inline-flex items-center gap-3">
+                <TypeIcon code={v.type.code} icon={v.type.icon} color={v.type.color} className="h-11 w-11" />
+                {v.type.name_uz}
+              </span>
+            }
+            subtitle={`#${v.code} · ${formatDateTime(v.occurred_at)} · ${v.camera.code}`}
             actions={
               <>
+                <SeverityBadge severity={v.type.severity} />
                 <ViolationStatusBadge status={v.status} />
                 <Link to="/violations" className="btn-secondary">
                   <ArrowLeft className="h-4 w-4" /> Ro‘yxatga qaytish
@@ -61,21 +146,14 @@ export default function ViolationDetailPage() {
             }
           />
 
+          <KeyFacts v={v} />
+
           <div className="grid gap-5 xl:grid-cols-3">
             <div className="space-y-5 xl:col-span-2">
               <Card>
-                <CardHeader title={t("violation.evidence")} />
-                <div className="p-4 pt-0">
-                  <CameraPreview seed={v.camera.id * 7 + v.id} status="ONLINE" className="rounded-[1.1rem]">
-                    <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 font-mono text-[11px] text-white">{v.camera.code}</span>
-                    <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 font-mono text-[11px] text-white">
-                      {formatDateTime(v.occurred_at)}
-                    </span>
-                    <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 text-xs text-ink">
-                      <ImageOff className="h-3.5 w-3.5" />
-                      {v.evidence.length > 0 ? `${v.evidence.length} ta dalil fayli` : t("violation.noEvidence")}
-                    </span>
-                  </CameraPreview>
+                <CardHeader title="Dalillar" subtitle="Kadrni bosing — kattalashtirish va zoom" />
+                <div className="p-5 pt-2">
+                  <EvidenceGallery evidence={v.evidence} onExpired={refreshEvidence} />
                 </div>
               </Card>
 
@@ -84,7 +162,7 @@ export default function ViolationDetailPage() {
                 <ol className="space-y-4 p-5">
                   {v.events.map((event) => (
                     <li key={event.id} className="flex gap-3">
-                      <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500" />
+                      <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-accent-500" />
                       <div className="text-sm">
                         <div className="font-medium text-ink">
                           {tDynamic("violation.event", event.event_type)}
@@ -115,33 +193,34 @@ export default function ViolationDetailPage() {
                 </Card>
               )}
               <Card>
-                <CardHeader title={t("violation.details")} />
+                <CardHeader title="Avtomobil" to={v.vehicle ? `/vehicles/${v.vehicle.id}` : undefined} />
+                <div className="px-5 pb-3">
+                  <VehicleFields v={v} title={null} />
+                </div>
+              </Card>
+              {v.vehicle && v.vehicle.total_violations > 1 && (
+                <Card>
+                  <CardHeader title="Shu avtomobil qoidabuzarliklari" subtitle={`Jami ${formatNumber(v.vehicle.total_violations)} ta`} />
+                  <VehicleHistory vehicleId={v.vehicle.id} currentId={v.id} />
+                  <div className="border-t border-line p-3">
+                    <Link to={`/vehicles/${v.vehicle.id}`} className="btn-secondary w-full">
+                      <Car className="h-4 w-4" /> To‘liq tarix <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </Card>
+              )}
+              <Card>
+                <CardHeader title="Texnik ma’lumotlar" />
                 <dl className="divide-y divide-line px-5 pb-3">
-                  <Field label={t("violation.type")}>
-                    <TypeChip name={v.type.name_uz} code={v.type.code} color={v.type.color} />
-                  </Field>
-                  <Field label="Daraja">
-                    <SeverityBadge severity={v.type.severity} />
-                  </Field>
-                  <Field label={t("violation.plate")}>
-                    <PlateNumber value={v.plate_number} />
-                  </Field>
-                  <Field label={t("violation.confidence")}>{formatConfidence(v.ai_confidence)}</Field>
                   {v.detected_speed !== null && (
                     <Field label={t("violation.speed")}>
                       {v.detected_speed.toFixed(0)} km/soat (chegara {v.speed_limit ?? "—"})
                     </Field>
                   )}
-                  {v.traffic_light_state && <Field label={t("violation.light")}>{v.traffic_light_state}</Field>}
-                  {v.direction && <Field label={t("violation.direction")}>{v.direction}</Field>}
-                  <Field label={t("violation.camera")}>
-                    <Link to={`/cameras/${v.camera.id}`} className="text-brand-700 hover:underline">
-                      {v.camera.code}
-                    </Link>
-                  </Field>
-                  <Field label={t("camera.location")}>
-                    {v.location ? `${v.location.name}, ${v.location.district.name}` : "—"}
-                  </Field>
+                  {v.traffic_light_state && <Field label={t("violation.light")}>{LIGHT_LABELS[v.traffic_light_state]}</Field>}
+                  {v.track_id && <Field label="Trek ID">{v.track_id}</Field>}
+                  <Field label="Qo‘shimcha signallar">{v.duplicate_count > 0 ? `${formatNumber(v.duplicate_count)} ta birlashtirilgan` : "yo‘q"}</Field>
+                  <Field label="Qayd etilgan">{formatDateTime(v.created_at)}</Field>
                   <Field label={t("violation.assigned")}>{v.assigned_to?.full_name ?? "—"}</Field>
                   {v.reviewed_by && (
                     <Field label="Ko‘rib chiqdi">
@@ -151,26 +230,6 @@ export default function ViolationDetailPage() {
                   {v.rejection_reason && <Field label={t("violation.rejectReason")}>{v.rejection_reason}</Field>}
                 </dl>
               </Card>
-              {v.vehicle && (
-                <Card>
-                  <CardHeader title={t("nav.vehicles")} />
-                  <dl className="divide-y divide-line px-5 pb-3">
-                    <Field label={t("vehicle.plate")}>
-                      <Link to={`/vehicles/${v.vehicle.id}`}>
-                        <PlateNumber value={v.vehicle.plate_display} />
-                      </Link>
-                    </Field>
-                    <Field label={t("vehicle.brandModel")}>
-                      {[v.vehicle.brand, v.vehicle.model].filter(Boolean).join(" ") || "—"}
-                    </Field>
-                    <Field label={t("vehicle.color")}>{v.vehicle.color ?? "—"}</Field>
-                    <Field label={t("vehicle.violations")}>{v.vehicle.total_violations}</Field>
-                    <Field label={t("violation.status")}>
-                      <VehicleStatusBadge status={v.vehicle.status} />
-                    </Field>
-                  </dl>
-                </Card>
-              )}
             </div>
           </div>
         </div>

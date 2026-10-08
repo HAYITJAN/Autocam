@@ -33,8 +33,12 @@ import type {
   ViolationAction,
   ViolationDetail,
   ViolationListItem,
+  ViolationStatistics,
   ViolationSummary,
+  ViolationTypeDetail,
   ViolationTypeOut,
+  ViolationTypeStat,
+  ViolatorItem,
 } from "@/lib/types";
 
 const LIVE = 30_000;
@@ -129,6 +133,35 @@ export const useViolationSummary = () =>
 export const useViolation = (id: number) =>
   useQuery({ queryKey: ["violation", id], queryFn: () => request<ViolationDetail>(`/violations/${id}`) });
 
+/** KPIs, groupings and series for one filter set (same params as `useViolations`). */
+export const useViolationStatistics = (params: QueryParams) =>
+  useQuery({
+    queryKey: ["violations", "statistics", params],
+    queryFn: () => request<ViolationStatistics>("/violations/statistics", { params }),
+    placeholderData: keepPreviousData,
+  });
+
+export const useViolationTypeStats = (params: QueryParams) =>
+  useQuery({
+    queryKey: ["violations", "types", params],
+    queryFn: () => request<ViolationTypeStat[]>("/violations/types", { params }),
+    placeholderData: keepPreviousData,
+  });
+
+export const useViolationTypeDetail = (typeRef: string, params: QueryParams) =>
+  useQuery({
+    queryKey: ["violations", "type", typeRef, params],
+    queryFn: () => request<ViolationTypeDetail>(`/violations/types/${encodeURIComponent(typeRef)}`, { params }),
+    placeholderData: keepPreviousData,
+  });
+
+export const useViolators = (params: QueryParams) =>
+  useQuery({
+    queryKey: ["violations", "vehicles", params],
+    queryFn: () => requestPage<ViolatorItem>("/violations/vehicles", { params }),
+    placeholderData: keepPreviousData,
+  });
+
 interface TransitionInput {
   action: ViolationAction;
   comment?: string;
@@ -173,10 +206,10 @@ export const useVehicleSummary = () =>
 export const useVehicle = (id: number) =>
   useQuery({ queryKey: ["vehicle", id], queryFn: () => request<VehicleDetail>(`/vehicles/${id}`) });
 
-export const useVehicleViolations = (id: number, page: number) =>
+export const useVehicleViolations = (id: number, page: number, pageSize = 10) =>
   useQuery({
-    queryKey: ["vehicle", id, "violations", page],
-    queryFn: () => requestPage<ViolationListItem>(`/vehicles/${id}/violations`, { params: { page, page_size: 10 } }),
+    queryKey: ["vehicle", id, "violations", page, pageSize],
+    queryFn: () => requestPage<ViolationListItem>(`/vehicles/${id}/violations`, { params: { page, page_size: pageSize } }),
     placeholderData: keepPreviousData,
   });
 
@@ -307,6 +340,14 @@ export const useViolationTypes = () =>
 
 export const useVehicleTypes = () =>
   useQuery({ queryKey: ["ref", "vehicle-types"], queryFn: () => request<VehicleTypeRef[]>("/vehicle-types"), staleTime: REFERENCE });
+
+/** Camera list for filter dropdowns (reference data, no live polling). */
+export const useCameraOptions = () =>
+  useQuery({
+    queryKey: ["ref", "camera-options"],
+    queryFn: () => requestPage<CameraListItem>("/cameras", { params: { page_size: 100, sort: "code" } }),
+    staleTime: REFERENCE,
+  });
 
 export const useDistricts = () =>
   useQuery({ queryKey: ["ref", "districts"], queryFn: () => request<DistrictRef[]>("/districts"), staleTime: REFERENCE });

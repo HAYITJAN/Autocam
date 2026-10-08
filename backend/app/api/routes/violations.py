@@ -95,9 +95,14 @@ async def violation_summary(
     responses=error_responses(401, 403, 422),
 )
 async def violation_statistics(
-    _: ViolationViewer, session: DbSession, tz: TzDep, filters: BoundedViolationFiltersDep
+    _: ViolationViewer,
+    session: DbSession,
+    tz: TzDep,
+    filters: BoundedViolationFiltersDep,
+    camera_limit: Annotated[int, Query(ge=1, le=500, description="Rows in `by_camera`")] = 10,
 ) -> ApiResponse[ViolationStatistics]:
-    return ApiResponse(data=await ViolationStatsService(session, tz).statistics(filters))
+    stats = await ViolationStatsService(session, tz).statistics(filters, camera_limit)
+    return ApiResponse(data=stats)
 
 
 @router.get(

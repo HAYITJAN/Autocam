@@ -13,6 +13,10 @@ const MonitoringPage = lazy(() => import("@/pages/MonitoringPage"));
 const CamerasPage = lazy(() => import("@/pages/CamerasPage"));
 const CameraDetailPage = lazy(() => import("@/pages/CameraDetailPage"));
 const ViolationsPage = lazy(() => import("@/pages/ViolationsPage"));
+const ViolationTypesPage = lazy(() => import("@/pages/ViolationTypesPage"));
+const ViolationTypePage = lazy(() => import("@/pages/ViolationTypePage"));
+const ViolatorsPage = lazy(() => import("@/pages/ViolatorsPage"));
+const ViolationCamerasPage = lazy(() => import("@/pages/ViolationCamerasPage"));
 const ViolationDetailPage = lazy(() => import("@/pages/ViolationDetailPage"));
 const VehiclesPage = lazy(() => import("@/pages/VehiclesPage"));
 const VehicleDetailPage = lazy(() => import("@/pages/VehicleDetailPage"));
@@ -58,6 +62,10 @@ export function App() {
             <Route path="cameras" element={<Guard permission="cameras.view"><CamerasPage /></Guard>} />
             <Route path="cameras/:id" element={<Guard permission="cameras.view"><CameraDetailPage /></Guard>} />
             <Route path="violations" element={<Guard permission="violations.view"><ViolationsPage /></Guard>} />
+            <Route path="violations/types" element={<Guard permission="violations.view"><ViolationTypesPage /></Guard>} />
+            <Route path="violations/types/:code" element={<Guard permission="violations.view"><ViolationTypePage /></Guard>} />
+            <Route path="violations/vehicles" element={<Guard permission="violations.view"><ViolatorsPage /></Guard>} />
+            <Route path="violations/cameras" element={<Guard permission="violations.view"><ViolationCamerasPage /></Guard>} />
             <Route path="violations/:id" element={<Guard permission="violations.view"><ViolationDetailPage /></Guard>} />
             <Route path="vehicles" element={<Guard permission="vehicles.view"><VehiclesPage /></Guard>} />
             <Route path="vehicles/:id" element={<Guard permission="vehicles.view"><VehicleDetailPage /></Guard>} />

@@ -3,7 +3,7 @@ import { Bell, FileText, Headset, LayoutGrid, LogOut, RefreshCw, Search, Setting
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { useSystemStatus, useUnreadCount } from "@/api/queries";
+import { useSystemStatus, useUnreadCount, useViolationTypes } from "@/api/queries";
 import { logout } from "@/lib/api";
 import { cn, DISPLAY_TZ } from "@/lib/format";
 import { t, type MessageKey } from "@/lib/i18n";
@@ -115,6 +115,7 @@ function SystemPulse() {
 
 function SearchBox() {
   const navigate = useNavigate();
+  const types = useViolationTypes();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -139,8 +140,11 @@ function SearchBox() {
     event.preventDefault();
     const query = value.trim();
     if (!query) return;
-    const target = /^cam-?\d+/i.test(query) ? "/cameras" : "/violations";
-    navigate(`${target}?search=${encodeURIComponent(query)}`);
+    // Plate, camera code and event code all go through the backend `search` filter;
+    // an exact type name/code opens that type's events.
+    const needle = query.toLocaleLowerCase();
+    const type = types.data?.find((item) => item.code.toLowerCase() === needle || item.name_uz.toLocaleLowerCase() === needle);
+    navigate(type ? `/violations/types/${type.code}` : `/violations?search=${encodeURIComponent(query)}`);
     setValue("");
     setOpen(false);
   };
@@ -160,7 +164,7 @@ function SearchBox() {
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => !value && setOpen(false)}
-        placeholder="Kamera kodi, raqam yoki ID…"
+        placeholder="Davlat raqami, kamera kodi yoki tur…"
         className="input pl-10 pr-10"
       />
       <button type="button" onClick={() => setOpen(false)} className="absolute right-3 top-3 text-mute hover:text-ink" aria-label="close">

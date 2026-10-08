@@ -275,6 +275,14 @@ class TestViolationEvents:
         events = await api.get("/api/v1/violations", params={"page_size": 1}, headers=headers)
         assert events.json()["meta"]["total"] == total
 
+        assert len(stats["by_camera"]) <= 10
+        every_camera = _data(
+            await api.get(
+                "/api/v1/violations/statistics", params={"camera_limit": 500}, headers=headers
+            )
+        )
+        assert sum(c["count"] for c in every_camera["by_camera"]) == total
+
     async def test_filters_scope_every_number(self, api: AsyncClient) -> None:
         headers = await _login(api, "viewer")
         params = {"violation_type": "RED_LIGHT"}
@@ -297,6 +305,7 @@ class TestViolationEvents:
         by_code = _data(await api.get(f"/api/v1/violations/types/{first['code']}", headers=headers))
         by_id = _data(await api.get(f"/api/v1/violations/types/{first['id']}", headers=headers))
         assert by_code["type"]["count"] == by_id["type"]["count"] == first["count"]
+        assert by_code["type"]["pct"] == first["pct"]
         assert sum(s["count"] for s in by_code["by_status"]) == first["count"]
         missing = await api.get("/api/v1/violations/types/NOPE", headers=headers)
         assert missing.status_code == 404

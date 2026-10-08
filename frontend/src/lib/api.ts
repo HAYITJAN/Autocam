@@ -35,6 +35,12 @@ export class ApiError extends Error {
   }
 }
 
+/** Media URLs from the API are server-absolute paths; resolve them against the API origin. */
+export function mediaUrl(path: string): string {
+  if (/^https?:\/\//.test(path) || !/^https?:\/\//.test(API_BASE)) return path;
+  return new URL(path, API_BASE).toString();
+}
+
 export type QueryValue = string | number | boolean | null | undefined | ReadonlyArray<string | number>;
 export type QueryParams = Record<string, QueryValue>;
 

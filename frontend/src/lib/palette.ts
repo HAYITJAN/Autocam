@@ -13,6 +13,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   STOP_LINE: "#6fd14a",
   LANE_VIOLATION: "#4fb0e6",
   NO_SEATBELT: "#a8a8a3",
+  PHONE_USAGE: "#14b8a6",
 
   CAR: "#121212",
   TRUCK: "#f5b740",

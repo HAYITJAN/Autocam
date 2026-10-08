@@ -76,6 +76,7 @@ export interface ViolationTypeOut {
   code: string;
   name_uz: string;
   name_en: string;
+  description: string | null;
   severity: Severity;
   color: string;
   icon: string | null;
@@ -89,6 +90,17 @@ export interface ViolationTypeRef {
   name_uz: string;
   severity: Severity;
   color: string;
+  icon?: string | null;
+}
+
+export interface VehicleRef {
+  id: number;
+  plate_number: string;
+  plate_display: string;
+  brand: string | null;
+  model: string | null;
+  color: string | null;
+  country: string;
 }
 
 export interface VehicleTypeRef {
@@ -219,10 +231,12 @@ export interface ViolationListItem {
   ai_confidence: number;
   detected_speed: number | null;
   speed_limit: number | null;
+  direction: string | null;
   type: ViolationTypeRef;
   camera: CameraRef;
   location_name: string | null;
   district_name: string | null;
+  vehicle: VehicleRef | null;
   vehicle_type: VehicleTypeRef | null;
   assigned_to: UserRef | null;
 }
@@ -237,36 +251,38 @@ export interface ViolationEventOut {
   created_at: string;
 }
 
-export interface VehicleBrief {
-  id: number;
-  plate_number: string;
-  plate_display: string;
-  brand: string | null;
-  model: string | null;
-  color: string | null;
+export interface VehicleBrief extends VehicleRef {
   status: VehicleStatus;
   total_violations: number;
 }
 
+export type EvidenceKind = "FULL_FRAME" | "VEHICLE" | "PLATE" | "CONTEXT" | "VIDEO";
+
 export interface EvidenceOut {
   id: number;
   evidence_type: string;
+  kind: EvidenceKind;
   mime_type: string;
   width: number | null;
   height: number | null;
+  duration_s: number | null;
   captured_at: string;
+  /** Short-lived signed URLs; usable directly in <img>/<video>. */
+  file_url: string;
+  thumbnail_url: string;
 }
 
 export interface ViolationDetail extends ViolationListItem {
   excess_speed: number | null;
-  direction: string | null;
   traffic_light_state: TrafficLightState | null;
   track_id: string | null;
   reviewed_by: UserRef | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
   created_at: string;
+  duplicate_count: number;
   location: LocationRef | null;
+  address: string | null;
   vehicle: VehicleBrief | null;
   evidence: EvidenceOut[];
   events: ViolationEventOut[];
@@ -296,6 +312,7 @@ export interface VehicleListItem {
   brand: string | null;
   model: string | null;
   color: string | null;
+  country: string;
   status: VehicleStatus;
   status_reason: string | null;
   total_detections: number;
@@ -309,7 +326,85 @@ export interface VehicleDetail extends VehicleListItem {
   vin: string | null;
   owner_name: string | null;
   notes: string | null;
+  violations_count: number;
+  first_violation_at: string | null;
+  last_violation_at: string | null;
+  violation_cameras: number;
   violations_by_type: TypeCount[];
+}
+
+// ------------------------------------------- violation events statistics
+
+export interface ViolationTypeStat {
+  id: number;
+  code: string;
+  name: string;
+  name_en: string;
+  description: string | null;
+  severity: Severity;
+  color: string;
+  icon: string | null;
+  is_active: boolean;
+  /** Violation events of this type (not vehicles). */
+  count: number;
+  unique_vehicles: number;
+  pct: number;
+  avg_confidence: number | null;
+  pending: number;
+  confirmed: number;
+  last_at: string | null;
+}
+
+export interface CameraStat {
+  id: number;
+  code: string;
+  name: string;
+  district: string | null;
+  count: number;
+  unique_vehicles: number;
+}
+
+export interface StatusCount {
+  status: ViolationStatus;
+  count: number;
+}
+
+export interface ViolationStatistics {
+  date_from: string;
+  date_to: string;
+  total_vehicles: number;
+  unique_vehicles: number;
+  total_violations: number;
+  unique_violators: number;
+  repeat_violators: number;
+  unrecognized_plates: number;
+  avg_confidence: number | null;
+  violation_rate_pct: number | null;
+  by_status: StatusCount[];
+  by_type: ViolationTypeStat[];
+  by_camera: CameraStat[];
+  by_hour: number[];
+  series: Timeseries;
+}
+
+export interface ViolationTypeDetail {
+  type: ViolationTypeStat;
+  by_status: StatusCount[];
+  by_camera: CameraStat[];
+  by_hour: number[];
+  series: Timeseries;
+}
+
+export interface ViolatorItem {
+  vehicle: VehicleRef;
+  vehicle_type: VehicleTypeRef | null;
+  status: VehicleStatus;
+  violations: number;
+  first_at: string;
+  last_at: string;
+  avg_confidence: number | null;
+  last_camera: CameraRef | null;
+  types: TypeCount[];
 }
 
 export interface VehicleSummary {
