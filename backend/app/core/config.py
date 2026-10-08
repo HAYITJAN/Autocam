@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = Field(default=15, ge=1, le=1440)
     jwt_refresh_expire_days: int = Field(default=7, ge=1, le=90)
     password_reset_expire_minutes: int = Field(default=30, ge=5, le=1440)
+    login_max_attempts: int = Field(default=5, ge=1, le=50)
+    login_lockout_minutes: int = Field(default=15, ge=1, le=1440)
     camera_secret_key: SecretStr | None = None
     stream_token_secret: SecretStr | None = None
 
@@ -79,6 +81,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env is Environment.PRODUCTION
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.is_production
 
     @property
     def docs_enabled(self) -> bool:
