@@ -22,15 +22,17 @@ Design documents live in [`docs/`](docs): [architecture](docs/ARCHITECTURE.md), 
 |---|---|---|
 | 1 | Foundation: repository, configuration, Docker, DB/Redis connectivity, error handling, health endpoints | done |
 | 2 | Data model (31 tables), Alembic migrations, seed data | done |
-| 3 | Authentication and authorization | next |
-| 3–20 | See [roadmap](docs/ROADMAP.md) | planned |
+| 3 | Authentication (JWT + rotating refresh cookie), RBAC, audit | done |
+| 4 | REST API: dashboard, cameras, violations workflow, vehicles, analytics, map, notifications | done |
+| 7 | Frontend: dashboard, monitoring, cameras, violations, vehicles, map, analytics, notifications | done (demo data) |
+| 5–20 | See [roadmap](docs/ROADMAP.md) | planned |
 
 ## Repository layout
 
 ```
 backend/      FastAPI application (app/), tests, Dockerfile
 ai-service/   Computer-vision pipeline service, tests, Dockerfile
-frontend/     React application (Phase 7)
+frontend/     React application, Dockerfile (static build served by nginx)
 docker/       nginx and PostgreSQL configuration
 docs/         Architecture, API and database specifications, mockups
 ```
@@ -46,6 +48,7 @@ docker compose up --build
 
 | URL | What |
 |---|---|
+| http://localhost | Web application (log in with the seeded admin) |
 | http://localhost/api/v1/system/health | Liveness |
 | http://localhost/api/v1/system/ready | Readiness (PostgreSQL, Redis, AI service) |
 | http://localhost:8000/api/docs | Swagger UI (development; port 8000 is exposed by the override file) |
@@ -118,6 +121,17 @@ python -m venv .venv
 ```
 
 On Linux/macOS use `.venv/bin/...` instead of `.\.venv\Scripts\...`.
+
+```powershell
+# Frontend (Vite proxies /api to http://localhost:8000)
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+npm run build        # type check + production bundle in dist/
+```
+
+Optional frontend variables are listed in [`frontend/.env.example`](frontend/.env.example).
+The backend must allow the dev origin: `CORS_ORIGINS=http://localhost:5173`.
 
 ## Quality checks
 

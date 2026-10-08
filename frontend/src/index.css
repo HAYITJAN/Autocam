@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --color-brand-50: #eff5ff;
+  --color-brand-100: #dbe7fe;
+  --color-brand-200: #bfd4fe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #1f6feb;
+  --color-brand-700: #1a5fd0;
+  --color-brand-800: #1e40af;
+  --color-page: #f3f6fb;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+}
+
+@utility card {
+  @apply rounded-2xl border border-slate-200/70 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_6px_16px_rgba(15,23,42,0.04)];
+}
+
+@utility input {
+  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-100;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+
+@utility btn-secondary {
+  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+}
+
+@utility btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-700;
+}
+
+@utility th {
+  @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+}
+
+@utility td {
+  @apply px-4 py-3 text-sm text-slate-700;
+}
+
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}
