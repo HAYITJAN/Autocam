@@ -11,12 +11,12 @@ import {
   useViolationsTimeseries,
 } from "@/api/queries";
 import { CameraPreview } from "@/components/CameraPreview";
-import { DonutChart, VolumeBars } from "@/components/charts";
-import { Card, CardHeader, CameraStatusBadge, KpiTile, Pagination, PageHeader, QueryView, ViolationStatusBadge } from "@/components/ui";
+import { DonutChart, Sparkline, VolumeBars } from "@/components/charts";
+import { Card, CardHeader, CameraStatusBadge, KpiTile, Pagination, PageHeader, QueryView, ShareBar, ViolationStatusBadge } from "@/components/ui";
 import { cn, formatBucket, formatNumber, formatPct, formatTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { categoryColor } from "@/lib/palette";
-import type { CameraListItem, CameraStatus } from "@/lib/types";
+import type { CameraListItem, CameraStatus, CameraSummary, DashboardKpis } from "@/lib/types";
 
 const GRID_OPTIONS = [4, 6, 9] as const;
 
@@ -148,6 +148,112 @@ function Last24h() {
   );
 }
 
+const STATUS_COLORS: Record<CameraStatus, string> = { ONLINE: "#5ccb3a", WARNING: "#f59e0b", OFFLINE: "#f43f5e", MAINTENANCE: "#8a8a87" };
+
+function MonitoringKpis({ summary, kpis }: { summary: CameraSummary | undefined; kpis: DashboardKpis | undefined }) {
+  const total = summary?.total ?? 0;
+  const share = (value: number) => formatPct((value / Math.max(total, 1)) * 100);
+  const today = kpis?.violations_today;
+  return (
+    <>
+      <KpiTile
+        icon={Camera}
+        tone="blue"
+        label="Jami kameralar"
+        value={summary?.total ?? "—"}
+        hint={summary ? `${summary.online + summary.warning} tasi ishlamoqda` : undefined}
+        footer={
+          summary && (
+            <ShareBar
+              total={total}
+              parts={(["ONLINE", "WARNING", "OFFLINE", "MAINTENANCE"] as CameraStatus[]).map((status) => ({
+                label: t(`camera.status.${status}`),
+                value: summary[status.toLowerCase() as Lowercase<CameraStatus>],
+                color: STATUS_COLORS[status],
+              }))}
+            />
+          )
+        }
+      />
+      <KpiTile
+        icon={CheckCircle2}
+        tone="green"
+        label="Online"
+        value={summary?.online ?? "—"}
+        hint={summary ? `${share(summary.online)} kameralar` : undefined}
+        spark={kpis && kpis.uptime_pct.sparkline.length > 1 && <Sparkline values={kpis.uptime_pct.sparkline} />}
+        footer={
+          kpis && (
+            <p className="text-[11px] text-mute">
+              30 kunlik uptime: <b className="font-semibold text-ink">{formatPct(kpis.uptime_pct.value)}</b>
+            </p>
+          )
+        }
+      />
+      <KpiTile
+        icon={XCircle}
+        tone="red"
+        label="Offline"
+        value={summary?.offline ?? "—"}
+        hint={summary ? `${share(summary.offline)} kameralar` : undefined}
+        footer={
+          summary && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-mute">
+              <span>
+                Ogohlantirish: <b className="font-semibold text-amber-600">{summary.warning}</b>
+              </span>
+              <span>
+                Ta’mirda: <b className="font-semibold text-ink">{summary.maintenance}</b>
+              </span>
+              <Link to="/cameras?status=OFFLINE" className="ml-auto font-medium text-ink underline decoration-ink/20 underline-offset-2 hover:decoration-ink">
+                Ko‘rish
+              </Link>
+            </div>
+          )
+        }
+      />
+      <KpiTile
+        icon={Car}
+        tone="sky"
+        label="Aniqlangan avtomobillar"
+        value={formatNumber(kpis?.total_vehicles.value)}
+        delta={kpis?.total_vehicles.delta_pct}
+        hint={kpis ? "7 kunda" : undefined}
+        spark={kpis && <Sparkline values={kpis.total_vehicles.sparkline} color="#4fb0e6" />}
+        footer={
+          kpis && (
+            <p className="text-[11px] text-mute">
+              Faol kameralar: <b className="font-semibold text-ink">{kpis.active_cameras.value}</b> / {kpis.total_cameras}
+            </p>
+          )
+        }
+      />
+      <KpiTile
+        icon={TriangleAlert}
+        tone="red"
+        label="Bugungi qoidabuzarliklar"
+        value={formatNumber(today?.value)}
+        delta={today?.delta_pct}
+        deltaPositiveIsGood={false}
+        hint={today ? "kechaga nisbatan" : undefined}
+        spark={today && <Sparkline values={today.sparkline} color="#f0566a" />}
+        footer={
+          kpis && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-mute">
+              <span>
+                Tasdiqlangan: <b className="font-semibold text-accent-700">{formatNumber(kpis.confirmed_today.value)}</b>
+              </span>
+              <span>
+                Kutilmoqda: <b className="font-semibold text-amber-600">{formatNumber(kpis.pending_today.value)}</b>
+              </span>
+            </div>
+          )
+        }
+      />
+    </>
+  );
+}
+
 export default function MonitoringPage() {
   const [grid, setGrid] = useState<(typeof GRID_OPTIONS)[number]>(6);
   const [page, setPage] = useState(1);
@@ -169,20 +275,7 @@ export default function MonitoringPage() {
       <PageHeader
         title={t("nav.monitoring")}
         subtitle="Barcha kameralar real vaqt rejimida. AI yordamida transport vositalari aniqlanmoqda."
-        stats={
-          <>
-            <KpiTile icon={Camera} tone="blue" label="Jami kameralar" value={summary.data?.total ?? "—"} />
-            <KpiTile icon={CheckCircle2} tone="green" label="Online" value={summary.data?.online ?? "—"} />
-            <KpiTile icon={XCircle} tone="red" label="Offline" value={summary.data?.offline ?? "—"} />
-            <KpiTile icon={Car} tone="sky" label="Aniqlangan avtomobillar" value={formatNumber(kpis.data?.total_vehicles.value)} />
-            <KpiTile
-              icon={TriangleAlert}
-              tone="red"
-              label="Bugungi qoidabuzarliklar"
-              value={formatNumber(kpis.data?.violations_today.value)}
-            />
-          </>
-        }
+        stats={<MonitoringKpis summary={summary.data} kpis={kpis.data} />}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

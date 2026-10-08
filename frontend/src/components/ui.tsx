@@ -166,6 +166,7 @@ export function KpiTile({
   deltaPositiveIsGood = true,
   hint,
   spark,
+  footer,
   className,
 }: {
   icon: LucideIcon;
@@ -176,6 +177,8 @@ export function KpiTile({
   deltaPositiveIsGood?: boolean;
   hint?: ReactNode;
   spark?: ReactNode;
+  /** Extra detail pinned to the bottom of the card (share bars, breakdowns). */
+  footer?: ReactNode;
   className?: string;
 }) {
   return (
@@ -196,6 +199,36 @@ export function KpiTile({
           {spark && <div className="w-24 shrink-0">{spark}</div>}
         </div>
       ) : null}
+      {footer && <div className="mt-auto pt-3">{footer}</div>}
+    </div>
+  );
+}
+
+export interface SharePart {
+  label: string;
+  value: number;
+  color: string;
+}
+
+/** Thin stacked bar with a compact legend, e.g. camera statuses inside a KPI card. */
+export function ShareBar({ parts, total }: { parts: SharePart[]; total: number }) {
+  const visible = parts.filter((part) => part.value > 0);
+  const sum = Math.max(total, 1);
+  return (
+    <div>
+      <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-soft">
+        {visible.map((part) => (
+          <span key={part.label} className="h-full rounded-full" style={{ width: `${(part.value / sum) * 100}%`, backgroundColor: part.color }} />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-mute">
+        {visible.map((part) => (
+          <span key={part.label} className="inline-flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: part.color }} />
+            {part.label} <b className="font-semibold text-ink">{formatNumber(part.value)}</b>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

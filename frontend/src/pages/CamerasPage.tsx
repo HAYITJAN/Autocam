@@ -193,7 +193,10 @@ function CameraPanel({ id, onClose }: { id: number; onClose: () => void }) {
 export default function CamerasPage() {
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get("search") ?? "");
-  const [status, setStatus] = useState<StatusTab>("");
+  const [status, setStatus] = useState<StatusTab>(() => {
+    const initial = params.get("status");
+    return initial && ["ONLINE", "WARNING", "OFFLINE", "MAINTENANCE"].includes(initial) ? (initial as StatusTab) : "";
+  });
   const [districtId, setDistrictId] = useState("");
   const [cameraType, setCameraType] = useState("");
   const [page, setPage] = useState(1);
