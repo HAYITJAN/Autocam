@@ -164,6 +164,7 @@ class ViolationTypeSeed:
     icon: str
     rule_params: dict[str, Any] = field(default_factory=dict)
     is_active: bool = True
+    description: str | None = None
 
 
 VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
@@ -175,6 +176,7 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#EF4444",
         "traffic-cone",
         {"min_confidence": 0.6, "grace_ms": 300},
+        description="Svetoforning qizil ishorasida to‘xtash chizig‘ini kesib o‘tish.",
     ),
     ViolationTypeSeed(
         "SPEEDING",
@@ -184,6 +186,7 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#F97316",
         "gauge",
         {"min_confidence": 0.6, "tolerance_kmh": 10},
+        description="Ruxsat etilgan tezlikni belgilangan chegaradan ortiq oshirish.",
     ),
     ViolationTypeSeed(
         "ILLEGAL_PARKING",
@@ -193,6 +196,7 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#EAB308",
         "square-parking",
         {"min_confidence": 0.6, "dwell_seconds": 60},
+        description="To‘xtash taqiqlangan hududda belgilangan vaqtdan uzoq turish.",
     ),
     ViolationTypeSeed(
         "WRONG_DIRECTION",
@@ -202,6 +206,7 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#DC2626",
         "arrow-left-right",
         {"min_confidence": 0.6, "angle_tolerance_deg": 60, "min_track_seconds": 2},
+        description="Bir tomonlama yoki ajratilgan yo‘lda qarama-qarshi yo‘nalishda harakat.",
     ),
     ViolationTypeSeed(
         "STOP_LINE",
@@ -211,6 +216,7 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#A855F7",
         "octagon-alert",
         {"min_confidence": 0.6},
+        description="Taqiqlovchi ishorada to‘xtash chizig‘idan o‘tib to‘xtash.",
     ),
     ViolationTypeSeed(
         "LANE_VIOLATION",
@@ -220,6 +226,7 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#0EA5E9",
         "split",
         is_active=False,
+        description="Yo‘l chiziqlari va harakat tasmalari qoidalarini buzish.",
     ),
     ViolationTypeSeed(
         "NO_SEATBELT",
@@ -229,6 +236,17 @@ VIOLATION_TYPES: tuple[ViolationTypeSeed, ...] = (
         "#64748B",
         "user-x",
         is_active=False,
+        description="Haydovchi yoki yo‘lovchi xavfsizlik kamarini taqmagan.",
+    ),
+    ViolationTypeSeed(
+        "PHONE_USAGE",
+        "Telefondan foydalanish",
+        "Phone usage",
+        Severity.MEDIUM,
+        "#14B8A6",
+        "smartphone",
+        is_active=False,
+        description="Harakat vaqtida qo‘lda telefon ushlab gaplashish yoki foydalanish.",
     ),
 )
 

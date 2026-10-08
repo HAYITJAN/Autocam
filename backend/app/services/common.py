@@ -12,6 +12,7 @@ from app.models import (
     District,
     Location,
     User,
+    Vehicle,
     VehicleType,
     Violation,
     ViolationType,
@@ -22,6 +23,7 @@ from app.schemas.domain import (
     DistrictRef,
     LocationRef,
     UserRef,
+    VehicleRef,
     VehicleTypeRef,
     ViolationListItem,
     ViolationTypeRef,
@@ -71,20 +73,63 @@ def location_ref(location: Location | None, district: District | None) -> Locati
 AssignedUser = aliased(User, name="assigned_user")
 
 
-def violation_rows_stmt() -> AnySelect:
+def violation_scope(*columns: Any) -> AnySelect:
+    """Violation events joined with everything `ViolationFilters` can filter on.
+
+    Every list, statistic and grouping is built on this so that one filter set
+    yields consistent numbers across KPIs, charts and tables.
+    """
     return (
-        select(Violation, ViolationType, Camera, Location, District, VehicleType, AssignedUser)
+        select(*columns)
+        .select_from(Violation)
         .join(ViolationType, Violation.violation_type_id == ViolationType.id)
         .join(Camera, Violation.camera_id == Camera.id)
         .outerjoin(Location, Violation.location_id == Location.id)
         .outerjoin(District, Location.district_id == District.id)
         .outerjoin(VehicleType, Violation.vehicle_type_id == VehicleType.id)
-        .outerjoin(AssignedUser, Violation.assigned_to == AssignedUser.id)
+        .outerjoin(Vehicle, Violation.vehicle_id == Vehicle.id)
     )
 
 
+def violation_rows_stmt() -> AnySelect:
+    return violation_scope(
+        Violation, ViolationType, Camera, Location, District, VehicleType, Vehicle, AssignedUser
+    ).outerjoin(AssignedUser, Violation.assigned_to == AssignedUser.id)
+
+
+def type_ref(vtype: ViolationType) -> ViolationTypeRef:
+    return ViolationTypeRef(
+        id=vtype.id,
+        code=vtype.code,
+        name_uz=vtype.name_uz,
+        severity=vtype.severity,
+        color=vtype.color,
+        icon=vtype.icon,
+    )
+
+
+def vehicle_ref(vehicle: Vehicle | None) -> VehicleRef | None:
+    if vehicle is None:
+        return None
+    return VehicleRef(
+        id=vehicle.id,
+        plate_number=vehicle.plate_number,
+        plate_display=vehicle.plate_display,
+        brand=vehicle.brand,
+        model=vehicle.model,
+        color=vehicle.color,
+        country=vehicle.country,
+    )
+
+
+def camera_ref(camera: Camera | None) -> CameraRef | None:
+    if camera is None:
+        return None
+    return CameraRef(id=camera.id, code=camera.code, name=camera.name)
+
+
 def violation_item(row: Any) -> ViolationListItem:
-    violation, vtype, camera, location, district, vehicle_type, assigned = row
+    violation, vtype, camera, location, district, vehicle_type, vehicle, assigned = row
     return ViolationListItem(
         id=violation.id,
         code=violation.code,
@@ -94,16 +139,12 @@ def violation_item(row: Any) -> ViolationListItem:
         ai_confidence=violation.ai_confidence,
         detected_speed=violation.detected_speed,
         speed_limit=violation.speed_limit,
-        type=ViolationTypeRef(
-            id=vtype.id,
-            code=vtype.code,
-            name_uz=vtype.name_uz,
-            severity=vtype.severity,
-            color=vtype.color,
-        ),
+        direction=violation.direction,
+        type=type_ref(vtype),
         camera=CameraRef(id=camera.id, code=camera.code, name=camera.name),
         location_name=location.name if location else None,
         district_name=district.name if district else None,
+        vehicle=vehicle_ref(vehicle),
         vehicle_type=vehicle_type_ref(vehicle_type),
         assigned_to=user_ref(assigned),
     )

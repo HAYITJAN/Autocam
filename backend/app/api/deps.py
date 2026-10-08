@@ -1,9 +1,10 @@
+import hmac
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,11 +17,32 @@ from app.db.session import get_db_session, get_engine
 from app.models.enums import UserStatus
 from app.services.audit import ClientInfo
 from app.services.auth import load_user_with_permissions
+from app.services.media import MediaSigner
 from app.services.system_health import HealthService
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
+
+
+def get_media_signer(settings: SettingsDep) -> MediaSigner:
+    return MediaSigner.from_settings(settings)
+
+
+MediaSignerDep = Annotated[MediaSigner, Depends(get_media_signer)]
+
+
+async def require_service_token(
+    settings: SettingsDep,
+    token: Annotated[str | None, Header(alias="X-Service-Token")] = None,
+) -> None:
+    """Machine-to-machine auth for the AI service (shared `AI_SERVICE_TOKEN`)."""
+    expected = settings.ai_service_token.get_secret_value().encode()
+    if not token or not hmac.compare_digest(token.encode(), expected):
+        raise UnauthorizedError("Service token is missing or invalid")
+
+
+ServiceAuth = Depends(require_service_token)
 
 bearer_scheme = HTTPBearer(auto_error=False, description="JWT access token from /auth/login")
 

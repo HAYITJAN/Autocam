@@ -1,84 +1,72 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 
 from app.api.deps import (
     ClientDep,
     CurrentUser,
     DbSession,
+    MediaSignerDep,
     ViolationConfirmer,
     ViolationRejecter,
     ViolationReviewer,
     ViolationViewer,
 )
-from app.api.params import Page, PageSize, TzDep
-from app.models.enums import ViolationStatus
+from app.api.params import (
+    BoundedViolationFiltersDep,
+    Page,
+    PageSize,
+    TzDep,
+    ViolationFiltersDep,
+)
 from app.schemas.common import ApiResponse, error_responses
 from app.schemas.domain import (
     CommentRequest,
     ConfirmRequest,
+    EvidenceOut,
     RejectRequest,
     ViolationDetail,
     ViolationListItem,
     ViolationSummary,
 )
-from app.services.violations import (
-    ViolationAction,
-    ViolationFilters,
-    ViolationService,
-    ViolationSort,
+from app.schemas.violation_stats import (
+    ViolationStatistics,
+    ViolationTypeDetail,
+    ViolationTypeStat,
+    ViolatorItem,
 )
+from app.services.media import MediaSigner
+from app.services.violation_stats import ViolationStatsService, ViolatorSort
+from app.services.violations import ViolationAction, ViolationService, ViolationSort
 
 router = APIRouter(prefix="/violations", tags=["Violations"])
 
 TRANSITION_ERRORS = error_responses(401, 403, 404, 409)
+FILTERS_NOTE = (
+    "Accepts the same filters as `GET /violations`; without `date_from`/`date_to` the "
+    "last 30 days are used."
+)
 
 
 @router.get(
     "",
-    summary="List violations",
-    description="Paginated, filterable violation list. **Permission:** `violations.view`.",
+    summary="List violation events",
+    description=(
+        "Paginated, filterable list of violation events (one row per event, so a vehicle "
+        "with three violations appears three times). **Permission:** `violations.view`."
+    ),
     response_model=ApiResponse[list[ViolationListItem]],
     responses=error_responses(401, 403, 422),
 )
 async def list_violations(
     _: ViolationViewer,
     session: DbSession,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
-    status: Annotated[list[ViolationStatus] | None, Query()] = None,
-    violation_type: Annotated[list[str] | None, Query()] = None,
-    camera_id: int | None = None,
-    location_id: int | None = None,
-    district_id: int | None = None,
-    vehicle_type: str | None = None,
-    vehicle_id: int | None = None,
-    plate: Annotated[str | None, Query(max_length=20)] = None,
-    search: Annotated[str | None, Query(max_length=50)] = None,
-    confidence_min: Annotated[float | None, Query(ge=0, le=1)] = None,
-    confidence_max: Annotated[float | None, Query(ge=0, le=1)] = None,
-    assigned_to: int | None = None,
+    filters: ViolationFiltersDep,
     sort: ViolationSort = ViolationSort.OCCURRED_DESC,
     page: Page = 1,
     page_size: PageSize = 20,
 ) -> ApiResponse[list[ViolationListItem]]:
-    filters = ViolationFilters(
-        date_from=date_from,
-        date_to=date_to,
-        status=status,
-        violation_type=violation_type,
-        camera_id=camera_id,
-        location_id=location_id,
-        district_id=district_id,
-        vehicle_type=vehicle_type,
-        vehicle_id=vehicle_id,
-        plate=plate,
-        search=search,
-        confidence_min=confidence_min,
-        confidence_max=confidence_max,
-        assigned_to=assigned_to,
-    )
     items, meta = await ViolationService(session).search(filters, page, page_size, sort)
     return ApiResponse(data=items, meta=meta)
 
@@ -96,17 +84,116 @@ async def violation_summary(
 
 
 @router.get(
+    "/statistics",
+    summary="Violation statistics for the selected filters",
+    description=(
+        "KPIs (passing vehicles, unique vehicles, events, unique and repeat violators, "
+        "average AI confidence), events by type/status/camera/hour and a time series. "
+        f"{FILTERS_NOTE} Traffic volume only honours place and time filters."
+    ),
+    response_model=ApiResponse[ViolationStatistics],
+    responses=error_responses(401, 403, 422),
+)
+async def violation_statistics(
+    _: ViolationViewer, session: DbSession, tz: TzDep, filters: BoundedViolationFiltersDep
+) -> ApiResponse[ViolationStatistics]:
+    return ApiResponse(data=await ViolationStatsService(session, tz).statistics(filters))
+
+
+@router.get(
+    "/types",
+    summary="Violation types with event counts",
+    description=(
+        f"Every active type (and any type with events) with its event count. {FILTERS_NOTE}"
+    ),
+    response_model=ApiResponse[list[ViolationTypeStat]],
+    responses=error_responses(401, 403, 422),
+)
+async def violation_types(
+    _: ViolationViewer, session: DbSession, tz: TzDep, filters: BoundedViolationFiltersDep
+) -> ApiResponse[list[ViolationTypeStat]]:
+    return ApiResponse(data=await ViolationStatsService(session, tz).types(filters))
+
+
+@router.get(
+    "/types/{type_ref}",
+    summary="One violation type with its statistics",
+    description=(
+        "`type_ref` is the numeric id or the code (e.g. `RED_LIGHT`). Events of the type "
+        f"are listed by `GET /violations?violation_type=CODE`. {FILTERS_NOTE}"
+    ),
+    response_model=ApiResponse[ViolationTypeDetail],
+    responses=error_responses(401, 403, 404, 422),
+)
+async def violation_type_detail(
+    type_ref: Annotated[str, Path(max_length=40, pattern=r"^[A-Za-z0-9_]+$")],
+    _: ViolationViewer,
+    session: DbSession,
+    tz: TzDep,
+    filters: BoundedViolationFiltersDep,
+) -> ApiResponse[ViolationTypeDetail]:
+    detail = await ViolationStatsService(session, tz).type_detail(type_ref, filters)
+    return ApiResponse(data=detail)
+
+
+@router.get(
+    "/vehicles",
+    summary="Violating vehicles",
+    description=(
+        "Recognised vehicles grouped from the matching events, with their event count, "
+        f"types and last camera. `min_violations=2` lists repeat violators. {FILTERS_NOTE}"
+    ),
+    response_model=ApiResponse[list[ViolatorItem]],
+    responses=error_responses(401, 403, 422),
+)
+async def violating_vehicles(
+    _: ViolationViewer,
+    session: DbSession,
+    tz: TzDep,
+    filters: BoundedViolationFiltersDep,
+    min_violations: Annotated[int, Query(ge=1, le=1000)] = 1,
+    sort: ViolatorSort = ViolatorSort.VIOLATIONS,
+    page: Page = 1,
+    page_size: PageSize = 20,
+) -> ApiResponse[list[ViolatorItem]]:
+    items, meta = await ViolationStatsService(session, tz).violators(
+        filters, page, page_size, sort, min_violations
+    )
+    return ApiResponse(data=items, meta=meta)
+
+
+@router.get(
     "/{violation_id}",
     summary="Violation details",
-    description="Details with timeline, evidence metadata and the actions allowed for the caller.",
+    description=(
+        "Details with timeline, evidence (signed URLs) and the actions allowed for the caller."
+    ),
     response_model=ApiResponse[ViolationDetail],
     responses=error_responses(401, 403, 404),
 )
 async def violation_detail(
-    violation_id: int, user: ViolationViewer, session: DbSession
+    violation_id: int, user: ViolationViewer, session: DbSession, signer: MediaSignerDep
 ) -> ApiResponse[ViolationDetail]:
-    detail = await ViolationService(session).detail(violation_id, user.permissions, user.role_code)
+    detail = await ViolationService(session).detail(
+        violation_id, user.permissions, user.role_code, signer
+    )
     return ApiResponse(data=detail)
+
+
+@router.get(
+    "/{violation_id}/evidence",
+    summary="Evidence of a violation",
+    description=(
+        "Full frame, vehicle, plate, context frames and video with short-lived signed "
+        "`file_url`/`thumbnail_url`."
+    ),
+    response_model=ApiResponse[list[EvidenceOut]],
+    responses=error_responses(401, 403, 404),
+)
+async def violation_evidence(
+    violation_id: int, _: ViolationViewer, session: DbSession, signer: MediaSignerDep
+) -> ApiResponse[list[EvidenceOut]]:
+    return ApiResponse(data=await ViolationService(session).evidence(violation_id, signer))
 
 
 async def _transition(
@@ -115,6 +202,7 @@ async def _transition(
     action: ViolationAction,
     user: CurrentUser,
     client: ClientDep,
+    signer: MediaSigner,
     comment: str | None = None,
 ) -> ApiResponse[ViolationDetail]:
     service = ViolationService(session)
@@ -127,7 +215,9 @@ async def _transition(
         client=client,
         comment=comment,
     )
-    return ApiResponse(data=await service.detail(violation_id, user.permissions, user.role_code))
+    return ApiResponse(
+        data=await service.detail(violation_id, user.permissions, user.role_code, signer)
+    )
 
 
 @router.post(
@@ -137,9 +227,13 @@ async def _transition(
     responses=TRANSITION_ERRORS,
 )
 async def review(
-    violation_id: int, user: ViolationReviewer, session: DbSession, client: ClientDep
+    violation_id: int,
+    user: ViolationReviewer,
+    session: DbSession,
+    client: ClientDep,
+    signer: MediaSignerDep,
 ) -> ApiResponse[ViolationDetail]:
-    return await _transition(session, violation_id, ViolationAction.REVIEW, user, client)
+    return await _transition(session, violation_id, ViolationAction.REVIEW, user, client, signer)
 
 
 @router.post(
@@ -154,9 +248,10 @@ async def confirm(
     user: ViolationConfirmer,
     session: DbSession,
     client: ClientDep,
+    signer: MediaSignerDep,
 ) -> ApiResponse[ViolationDetail]:
     return await _transition(
-        session, violation_id, ViolationAction.CONFIRM, user, client, body.comment
+        session, violation_id, ViolationAction.CONFIRM, user, client, signer, body.comment
     )
 
 
@@ -172,9 +267,10 @@ async def reject(
     user: ViolationRejecter,
     session: DbSession,
     client: ClientDep,
+    signer: MediaSignerDep,
 ) -> ApiResponse[ViolationDetail]:
     return await _transition(
-        session, violation_id, ViolationAction.REJECT, user, client, body.reason
+        session, violation_id, ViolationAction.REJECT, user, client, signer, body.reason
     )
 
 
@@ -185,9 +281,13 @@ async def reject(
     responses=TRANSITION_ERRORS,
 )
 async def archive(
-    violation_id: int, user: ViolationConfirmer, session: DbSession, client: ClientDep
+    violation_id: int,
+    user: ViolationConfirmer,
+    session: DbSession,
+    client: ClientDep,
+    signer: MediaSignerDep,
 ) -> ApiResponse[ViolationDetail]:
-    return await _transition(session, violation_id, ViolationAction.ARCHIVE, user, client)
+    return await _transition(session, violation_id, ViolationAction.ARCHIVE, user, client, signer)
 
 
 @router.post(
@@ -197,9 +297,13 @@ async def archive(
     responses=TRANSITION_ERRORS,
 )
 async def reopen(
-    violation_id: int, user: ViolationConfirmer, session: DbSession, client: ClientDep
+    violation_id: int,
+    user: ViolationConfirmer,
+    session: DbSession,
+    client: ClientDep,
+    signer: MediaSignerDep,
 ) -> ApiResponse[ViolationDetail]:
-    return await _transition(session, violation_id, ViolationAction.REOPEN, user, client)
+    return await _transition(session, violation_id, ViolationAction.REOPEN, user, client, signer)
 
 
 @router.post(
@@ -214,7 +318,10 @@ async def add_comment(
     user: ViolationReviewer,
     session: DbSession,
     client: ClientDep,
+    signer: MediaSignerDep,
 ) -> ApiResponse[ViolationDetail]:
     service = ViolationService(session)
     await service.add_comment(violation_id, body.comment, user_id=user.id, client=client)
-    return ApiResponse(data=await service.detail(violation_id, user.permissions, user.role_code))
+    return ApiResponse(
+        data=await service.detail(violation_id, user.permissions, user.role_code, signer)
+    )

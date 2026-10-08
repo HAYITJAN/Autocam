@@ -1,6 +1,7 @@
 """Response/request models for the core domain (cameras, violations, vehicles, notifications)."""
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import Field
@@ -10,6 +11,7 @@ from app.models.enums import (
     CameraType,
     ConnectionStatus,
     ConnectionType,
+    EvidenceType,
     LocationType,
     NotificationState,
     NotificationType,
@@ -45,6 +47,7 @@ class ViolationTypeOut(ApiModel):
     code: str
     name_uz: str
     name_en: str
+    description: str | None
     severity: Severity
     color: str
     icon: str | None
@@ -58,6 +61,17 @@ class ViolationTypeRef(ApiModel):
     name_uz: str
     severity: Severity
     color: str
+    icon: str | None = None
+
+
+class VehicleRef(ApiModel):
+    id: int
+    plate_number: str
+    plate_display: str
+    brand: str | None
+    model: str | None
+    color: str | None
+    country: str
 
 
 class VehicleTypeRef(ApiModel):
@@ -182,10 +196,12 @@ class ViolationListItem(ApiModel):
     ai_confidence: float
     detected_speed: float | None
     speed_limit: float | None
+    direction: str | None
     type: ViolationTypeRef
     camera: CameraRef
     location_name: str | None
     district_name: str | None
+    vehicle: VehicleRef | None
     vehicle_type: VehicleTypeRef | None
     assigned_to: UserRef | None
 
@@ -200,36 +216,45 @@ class ViolationEventOut(ApiModel):
     created_at: datetime
 
 
-class VehicleBrief(ApiModel):
-    id: int
-    plate_number: str
-    plate_display: str
-    brand: str | None
-    model: str | None
-    color: str | None
+class VehicleBrief(VehicleRef):
     status: VehicleStatus
     total_violations: int
 
 
+class EvidenceKind(StrEnum):
+    """Presentation grouping of the stored evidence types."""
+
+    FULL_FRAME = "FULL_FRAME"
+    VEHICLE = "VEHICLE"
+    PLATE = "PLATE"
+    CONTEXT = "CONTEXT"
+    VIDEO = "VIDEO"
+
+
 class EvidenceOut(ApiModel):
     id: int
-    evidence_type: str
+    evidence_type: EvidenceType
+    kind: EvidenceKind
     mime_type: str
     width: int | None
     height: int | None
+    duration_s: float | None
     captured_at: datetime
+    file_url: str = Field(description="Short-lived signed URL of the original file")
+    thumbnail_url: str = Field(description="Short-lived signed URL of the preview")
 
 
 class ViolationDetail(ViolationListItem):
     excess_speed: float | None
-    direction: str | None
     traffic_light_state: TrafficLightState | None
     track_id: str | None
     reviewed_by: UserRef | None
     reviewed_at: datetime | None
     rejection_reason: str | None
     created_at: datetime
+    duplicate_count: int
     location: LocationRef | None
+    address: str | None
     vehicle: VehicleBrief | None
     evidence: list[EvidenceOut]
     events: list[ViolationEventOut]
@@ -272,6 +297,7 @@ class VehicleListItem(ApiModel):
     brand: str | None
     model: str | None
     color: str | None
+    country: str
     status: VehicleStatus
     status_reason: str | None
     total_detections: int
@@ -285,6 +311,10 @@ class VehicleDetail(VehicleListItem):
     vin: str | None
     owner_name: str | None
     notes: str | None
+    violations_count: int = Field(description="Violation events recorded for this vehicle")
+    first_violation_at: datetime | None
+    last_violation_at: datetime | None
+    violation_cameras: int = Field(description="Distinct cameras that recorded its violations")
     violations_by_type: list["TypeCount"]
 
 

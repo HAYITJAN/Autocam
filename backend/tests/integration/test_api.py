@@ -9,7 +9,7 @@ import random
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 from alembic.config import Config
@@ -256,6 +256,145 @@ class TestViolationWorkflow:
             f"/api/v1/violations/{items[0]['id']}/reject", json={}, headers=headers
         )
         assert response.status_code == 422
+
+
+class TestViolationEvents:
+    async def test_statistics_follow_counting_rules(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        stats = _data(await api.get("/api/v1/violations/statistics", headers=headers))
+        total = stats["total_violations"]
+        assert total > 0
+        assert sum(t["count"] for t in stats["by_type"]) == total
+        assert sum(s["count"] for s in stats["by_status"]) == total
+        assert sum(stats["by_hour"]) == total
+        assert sum(stats["series"]["totals"]) == total
+        assert stats["repeat_violators"] <= stats["unique_violators"] <= total
+        assert stats["unique_vehicles"] <= stats["total_vehicles"]
+        assert stats["total_vehicles"] > total
+
+        events = await api.get("/api/v1/violations", params={"page_size": 1}, headers=headers)
+        assert events.json()["meta"]["total"] == total
+
+    async def test_filters_scope_every_number(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        params = {"violation_type": "RED_LIGHT"}
+        stats = _data(
+            await api.get("/api/v1/violations/statistics", params=params, headers=headers)
+        )
+        events = await api.get(
+            "/api/v1/violations", params={**params, "page_size": 100}, headers=headers
+        )
+        assert {e["type"]["code"] for e in _data(events)} <= {"RED_LIGHT"}
+        assert events.json()["meta"]["total"] == stats["total_violations"]
+        red = next(t for t in stats["by_type"] if t["code"] == "RED_LIGHT")
+        assert red["count"] == stats["total_violations"]
+
+    async def test_types_and_type_detail(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        types = _data(await api.get("/api/v1/violations/types", headers=headers))
+        assert [t["count"] for t in types] == sorted((t["count"] for t in types), reverse=True)
+        first = types[0]
+        by_code = _data(await api.get(f"/api/v1/violations/types/{first['code']}", headers=headers))
+        by_id = _data(await api.get(f"/api/v1/violations/types/{first['id']}", headers=headers))
+        assert by_code["type"]["count"] == by_id["type"]["count"] == first["count"]
+        assert sum(s["count"] for s in by_code["by_status"]) == first["count"]
+        missing = await api.get("/api/v1/violations/types/NOPE", headers=headers)
+        assert missing.status_code == 404
+
+    async def test_violating_vehicles(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        stats = _data(await api.get("/api/v1/violations/statistics", headers=headers))
+        response = await api.get("/api/v1/violations/vehicles", headers=headers)
+        items = _data(response)
+        assert response.json()["meta"]["total"] == stats["unique_violators"]
+        top = items[0]
+        assert sum(t["count"] for t in top["types"]) == top["violations"]
+        history = await api.get(
+            f"/api/v1/vehicles/{top['vehicle']['id']}/violations",
+            params={"date_from": stats["date_from"], "date_to": stats["date_to"]},
+            headers=headers,
+        )
+        assert history.json()["meta"]["total"] >= top["violations"]
+        repeat = await api.get(
+            "/api/v1/violations/vehicles", params={"min_violations": 2}, headers=headers
+        )
+        assert repeat.json()["meta"]["total"] == stats["repeat_violators"]
+
+    async def test_search_matches_camera_and_type(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        by_camera = _data(
+            await api.get("/api/v1/violations", params={"search": "CAM-001"}, headers=headers)
+        )
+        assert all(e["camera"]["code"] == "CAM-001" for e in by_camera)
+        by_type = _data(
+            await api.get("/api/v1/violations", params={"search": "RED_LIGHT"}, headers=headers)
+        )
+        assert by_type
+        assert {e["type"]["code"] for e in by_type} == {"RED_LIGHT"}
+
+    async def test_evidence_urls_are_signed(self, api: AsyncClient) -> None:
+        headers = await _login(api, "viewer")
+        item = _data(await api.get("/api/v1/violations", params={"page_size": 1}, headers=headers))
+        evidence = _data(
+            await api.get(f"/api/v1/violations/{item[0]['id']}/evidence", headers=headers)
+        )
+        assert evidence[0]["kind"] == "FULL_FRAME"
+        assert {"FULL_FRAME", "VEHICLE", "CONTEXT"} <= {e["kind"] for e in evidence}
+        media = await api.get(evidence[0]["file_url"])
+        assert media.status_code == 200
+        assert media.headers["content-type"].startswith("image/svg+xml")
+        tampered = await api.get(
+            evidence[0]["file_url"].replace("variant=original", "variant=thumbnail")
+        )
+        assert tampered.status_code == 403
+
+
+class TestIngestion:
+    EVENT: ClassVar[dict[str, Any]] = {
+        "camera_code": "CAM-002",
+        "violation_type": "SPEEDING",
+        "occurred_at": "2026-01-15T09:00:00+05:00",
+        "ai_confidence": 0.8,
+        "plate_number": "01 T 111 ST",
+        "vehicle_type": "CAR",
+        "detected_speed": 92,
+        "speed_limit": 60,
+    }
+
+    async def test_requires_service_token(self, api: AsyncClient) -> None:
+        response = await api.post("/api/v1/internal/violations", json=self.EVENT)
+        assert response.status_code == 401
+
+    async def test_close_reports_are_folded_and_later_ones_kept(self, api: AsyncClient) -> None:
+        token = {"X-Service-Token": os.environ["AI_SERVICE_TOKEN"]}
+        url = "/api/v1/internal/violations"
+        first = await api.post(url, json=self.EVENT, headers=token)
+        assert first.status_code == 201, first.text
+        again = await api.post(
+            url,
+            json={**self.EVENT, "occurred_at": "2026-01-15T09:00:25+05:00", "ai_confidence": 0.9},
+            headers=token,
+        )
+        assert again.status_code == 200
+        assert again.json()["data"] == {
+            **first.json()["data"],
+            "duplicate": True,
+            "duplicate_count": 1,
+        }
+        later = await api.post(
+            url, json={**self.EVENT, "occurred_at": "2026-01-15T09:30:00+05:00"}, headers=token
+        )
+        assert later.status_code == 201
+        assert later.json()["data"]["id"] != first.json()["data"]["id"]
+
+        headers = await _login(api, "viewer")
+        detail = _data(
+            await api.get(f"/api/v1/violations/{first.json()['data']['id']}", headers=headers)
+        )
+        assert detail["duplicate_count"] == 1
+        assert detail["ai_confidence"] == 0.9
+        assert detail["vehicle"]["total_violations"] == 2
+        assert detail["excess_speed"] == 32
 
 
 class TestNotifications:

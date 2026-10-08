@@ -8,7 +8,7 @@ import secrets
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -188,6 +188,7 @@ async def _seed_types(session: AsyncSession, report: SeedReport) -> None:
                     "code": v.code,
                     "name_uz": v.name_uz,
                     "name_en": v.name_en,
+                    "description": v.description,
                     "severity": v.severity,
                     "color": v.color,
                     "icon": v.icon,
@@ -201,6 +202,14 @@ async def _seed_types(session: AsyncSession, report: SeedReport) -> None:
         .returning(ViolationType.id)
     )
     report.add("violation_types", len(result.all()))
+    # Types created before descriptions existed get the reference text once; admin edits stay.
+    for v in ref.VIOLATION_TYPES:
+        if v.description:
+            await session.execute(
+                update(ViolationType)
+                .where(ViolationType.code == v.code, ViolationType.description.is_(None))
+                .values(description=v.description)
+            )
 
 
 async def _seed_ai_models(session: AsyncSession, report: SeedReport) -> int | None:

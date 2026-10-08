@@ -63,6 +63,13 @@ class Settings(BaseSettings):
 
     storage_backend: StorageBackend = StorageBackend.LOCAL
     storage_path: str = "./storage_data"
+    media_url_ttl_seconds: int = Field(default=900, ge=60, le=86400)
+    violation_dedup_window_seconds: int = Field(
+        default=60,
+        ge=0,
+        le=3600,
+        description="Reports of the same vehicle/camera/type closer than this are one event",
+    )
     s3_endpoint: str | None = None
     s3_region: str = "us-east-1"
     s3_bucket: str = "smart-traffic-evidence"

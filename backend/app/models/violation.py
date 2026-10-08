@@ -40,6 +40,7 @@ class ViolationType(IdentityPK, TimestampMixin, Base):
     code: Mapped[str] = mapped_column(String(40), unique=True)
     name_uz: Mapped[str] = mapped_column(String(100))
     name_en: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str | None] = mapped_column(Text)
     severity: Mapped[Severity] = mapped_column(pg_enum(Severity, "severity"))
     fine_amount: Mapped[float | None] = mapped_column(Numeric(12, 2, asdecimal=False))
     color: Mapped[str] = mapped_column(String(9))
@@ -49,12 +50,25 @@ class ViolationType(IdentityPK, TimestampMixin, Base):
 
 
 class Violation(IdentityPK, TimestampMixin, Base):
-    """Plate search uses a pg_trgm GIN index created by the migration when the extension exists."""
+    """One detected violation event (camera = source, vehicle = object, type = grouping).
+
+    Plate search uses a pg_trgm GIN index created by the migration when the extension exists.
+    Repeated AI reports of the same event are folded into the original row
+    (`duplicate_count`) instead of creating new events.
+    """
 
     __tablename__ = "violations"
     __table_args__: Any = (
         CheckConstraint("ai_confidence BETWEEN 0 AND 1", name="ai_confidence_range"),
         CheckConstraint("excess_speed IS NULL OR excess_speed >= 0", name="excess_speed_positive"),
+        CheckConstraint("duplicate_count >= 0", name="duplicate_count_positive"),
+        Index(
+            "ix_violations_dedup",
+            "camera_id",
+            "violation_type_id",
+            "plate_number",
+            text("occurred_at DESC"),
+        ),
         Index("ix_violations_status_occurred", "status", text("occurred_at DESC")),
         Index("ix_violations_camera_occurred", "camera_id", text("occurred_at DESC")),
         Index("ix_violations_type_occurred", "violation_type_id", text("occurred_at DESC")),
@@ -103,6 +117,7 @@ class Violation(IdentityPK, TimestampMixin, Base):
     reviewed_at: Mapped[datetime | None]
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     idempotency_key: Mapped[str | None] = mapped_column(String(200), unique=True)
+    duplicate_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     meta: Mapped[dict[str, Any]] = json_column("metadata")
 
     violation_type: Mapped[ViolationType] = relationship(lazy="raise")

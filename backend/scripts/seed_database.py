@@ -89,9 +89,8 @@ async def run(args: argparse.Namespace) -> int:
     print("Base seed:", ", ".join(f"{k}={v}" for k, v in created.items()) or "nothing new")
     if demo is not None:
         if demo.skipped_reason:
-            print(f"Demo seed skipped: {demo.skipped_reason}")
-        else:
-            print("Demo seed:", ", ".join(f"{k}={v}" for k, v in demo.created.items()))
+            print(f"Demo history skipped: {demo.skipped_reason}")
+        print("Demo seed:", ", ".join(f"{k}={v}" for k, v in demo.created.items()) or "nothing new")
     for username, password in report.generated_passwords.items():
         print(f"Generated password for '{username}': {password}  (shown once, change after login)")
     return 0

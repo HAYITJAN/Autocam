@@ -2,8 +2,9 @@
 
 Generates vehicles, ~30 days of violations with a realistic daily/hourly profile, their
 review timelines, camera status + health history and notifications. All rows are marked as
-demo data (`metadata.demo = true` on violations) and nothing is generated when vehicles
-already exist, so the command is safe to re-run.
+demo data (`metadata.demo = true` on violations) and the history is not generated again
+when vehicles already exist. Traffic counters, detections and evidence are backfilled by
+`demo_backfill` whenever their tables are empty, so the command is safe to re-run.
 """
 
 import random
@@ -46,6 +47,7 @@ from app.models.enums import (
     ViolationEventType,
     ViolationStatus,
 )
+from app.seed.demo_backfill import seed_demo_backfill
 from app.seed.reference import ADMIN_ROLE
 
 TASHKENT_TZ = timezone(timedelta(hours=5), "Asia/Tashkent")
@@ -149,12 +151,29 @@ async def seed_demo(
     days: int = 30,
     vehicle_count: int = 2000,
 ) -> DemoReport:
+    """Violation history once, then the (idempotent) traffic/detection/evidence backfill.
+
+    The backfill also completes databases seeded before those tables were generated.
+    """
     report = DemoReport()
+    await _ensure_partitions(session, now - timedelta(days=max(days, HEALTH_HISTORY_DAYS)), now)
     if await session.scalar(select(func.count()).select_from(Vehicle)):
         report.skipped_reason = "vehicles already exist"
-        return report
+    else:
+        await _seed_history(session, rng, now, days, vehicle_count, report)
+    backfilled = await seed_demo_backfill(session, rng=rng, now=now, days=days, tz=TASHKENT_TZ)
+    report.created.update({key: count for key, count in backfilled.items() if count})
+    return report
 
-    await _ensure_partitions(session, now - timedelta(days=max(days, HEALTH_HISTORY_DAYS)), now)
+
+async def _seed_history(
+    session: AsyncSession,
+    rng: random.Random,
+    now: datetime,
+    days: int,
+    vehicle_count: int,
+    report: DemoReport,
+) -> None:
     cameras = await _load_cameras(session)
     if not cameras:
         raise RuntimeError("Base seed must run before demo data (no cameras found)")
@@ -255,7 +274,6 @@ async def seed_demo(
     await session.execute(
         update(SystemSetting).where(SystemSetting.key == "demo.enabled").values(value=True)
     )
-    return report
 
 
 async def _ensure_partitions(session: AsyncSession, start: datetime, end: datetime) -> None:

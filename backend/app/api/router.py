@@ -4,6 +4,8 @@ from app.api.routes import (
     auth,
     cameras,
     insights,
+    internal,
+    media,
     notifications,
     reference,
     system,
@@ -22,3 +24,5 @@ api_router.include_router(insights.analytics)
 api_router.include_router(insights.map_router)
 api_router.include_router(notifications.router)
 api_router.include_router(reference.router)
+api_router.include_router(media.router)
+api_router.include_router(internal.router)

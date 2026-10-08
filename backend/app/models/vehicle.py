@@ -38,6 +38,7 @@ class Vehicle(IdentityPK, TimestampMixin, Base):
     brand: Mapped[str | None] = mapped_column(String(60))
     model: Mapped[str | None] = mapped_column(String(60))
     color: Mapped[str | None] = mapped_column(String(30))
+    country: Mapped[str] = mapped_column(String(2), default="UZ", server_default="UZ")
     vin: Mapped[str | None] = mapped_column(String(17))
     owner_name: Mapped[str | None] = mapped_column(String(150))
     status: Mapped[VehicleStatus] = mapped_column(

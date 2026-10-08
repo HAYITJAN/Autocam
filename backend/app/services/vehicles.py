@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundError
@@ -56,6 +56,7 @@ def _item(row: Any) -> VehicleListItem:
         brand=vehicle.brand,
         model=vehicle.model,
         color=vehicle.color,
+        country=vehicle.country,
         status=vehicle.status,
         status_reason=vehicle.status_reason,
         total_detections=vehicle.total_detections,
@@ -147,11 +148,24 @@ class VehicleService:
             )
         ).all()
         total = sum(int(k) for *_, k in by_type)
+        first_at, last_at, cameras = (
+            await self.session.execute(
+                select(
+                    func.min(Violation.occurred_at),
+                    func.max(Violation.occurred_at),
+                    func.count(distinct(Violation.camera_id)),
+                ).where(Violation.vehicle_id == vehicle_id)
+            )
+        ).one()
         return VehicleDetail(
             **_item(row).model_dump(),
             vin=vehicle.vin,
             owner_name=vehicle.owner_name,
             notes=vehicle.notes,
+            violations_count=total,
+            first_violation_at=first_at,
+            last_violation_at=last_at,
+            violation_cameras=cameras,
             violations_by_type=[
                 TypeCount(code=c, name=n, color=col, count=k, pct=pct(k, total))
                 for c, n, col, k in by_type

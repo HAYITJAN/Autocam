@@ -9,6 +9,7 @@ from sqlalchemy.orm import aliased
 
 from app.core.errors import ConflictError, ErrorCode, ForbiddenError, NotFoundError
 from app.models import (
+    Camera,
     Location,
     User,
     Vehicle,
@@ -37,6 +38,7 @@ from app.services.common import (
     violation_item,
     violation_rows_stmt,
 )
+from app.services.media import MediaSigner, evidence_out, sort_evidence
 from app.services.timeutil import local_day_start, pct_change
 
 PENDING = (ViolationStatus.NEW, ViolationStatus.UNDER_REVIEW)
@@ -100,23 +102,44 @@ _SORT_COLUMNS: dict[ViolationSort, Any] = {
 
 @dataclass(slots=True)
 class ViolationFilters:
+    """Filters shared by the event list, statistics, type and violator groupings.
+
+    `apply` expects a statement built on `violation_scope` (or `violation_rows_stmt`).
+    """
+
     date_from: datetime | None = None
     date_to: datetime | None = None
     status: list[ViolationStatus] | None = None
     violation_type: list[str] | None = None
     camera_id: int | None = None
+    camera_code: str | None = None
     location_id: int | None = None
     district_id: int | None = None
+    direction: list[str] | None = None
     vehicle_type: str | None = None
     vehicle_id: int | None = None
+    vehicle_model: str | None = None
     plate: str | None = None
     search: str | None = None
     confidence_min: float | None = None
     confidence_max: float | None = None
     assigned_to: int | None = None
 
-    def apply(self, stmt: AnySelect) -> AnySelect:
+    def place_conditions(self) -> list[Any]:
+        """Conditions on the source camera only (used for traffic volume as well)."""
         conditions: list[Any] = []
+        if self.camera_id:
+            conditions.append(Camera.id == self.camera_id)
+        if self.camera_code:
+            conditions.append(Camera.code == self.camera_code.strip().upper())
+        if self.location_id:
+            conditions.append(Camera.location_id == self.location_id)
+        if self.district_id:
+            conditions.append(Location.district_id == self.district_id)
+        return conditions
+
+    def apply(self, stmt: AnySelect) -> AnySelect:
+        conditions = self.place_conditions()
         if self.date_from:
             conditions.append(Violation.occurred_at >= self.date_from)
         if self.date_to:
@@ -124,25 +147,23 @@ class ViolationFilters:
         if self.status:
             conditions.append(Violation.status.in_(self.status))
         if self.violation_type:
-            conditions.append(ViolationType.code.in_(self.violation_type))
-        if self.camera_id:
-            conditions.append(Violation.camera_id == self.camera_id)
-        if self.location_id:
-            conditions.append(Violation.location_id == self.location_id)
-        if self.district_id:
-            conditions.append(Location.district_id == self.district_id)
+            conditions.append(ViolationType.code.in_([c.upper() for c in self.violation_type]))
+        if self.direction:
+            conditions.append(Violation.direction.in_([d.upper() for d in self.direction]))
         if self.vehicle_type:
             conditions.append(VehicleType.code == self.vehicle_type)
         if self.vehicle_id:
             conditions.append(Violation.vehicle_id == self.vehicle_id)
-        if self.plate:
-            conditions.append(Violation.plate_number.contains(normalize_plate(self.plate)))
-        if self.search:
-            term = self.search.strip()
+        if self.vehicle_model:
             conditions.append(
-                Violation.code.ilike(f"%{term}%")
-                | Violation.plate_number.contains(normalize_plate(term))
+                func.concat_ws(" ", Vehicle.brand, Vehicle.model).ilike(
+                    like_pattern(self.vehicle_model), escape="\\"
+                )
             )
+        if self.plate and (plate := normalize_plate(self.plate)):
+            conditions.append(Violation.plate_number.contains(plate, autoescape=True))
+        if self.search and (term := self.search.strip()):
+            conditions.append(_search_condition(term))
         if self.confidence_min is not None:
             conditions.append(Violation.ai_confidence >= self.confidence_min)
         if self.confidence_max is not None:
@@ -150,6 +171,26 @@ class ViolationFilters:
         if self.assigned_to:
             conditions.append(Violation.assigned_to == self.assigned_to)
         return stmt.where(*conditions) if conditions else stmt
+
+
+def like_pattern(term: str) -> str:
+    escaped = term.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _search_condition(term: str) -> Any:
+    """Global search: event code, plate, camera code or violation type name/code."""
+    pattern = like_pattern(term)
+    condition = (
+        Violation.code.ilike(pattern, escape="\\")
+        | Camera.code.ilike(pattern, escape="\\")
+        | ViolationType.name_uz.ilike(pattern, escape="\\")
+        | ViolationType.name_en.ilike(pattern, escape="\\")
+        | (ViolationType.code == term.upper())
+    )
+    if plate := normalize_plate(term):
+        condition = condition | Violation.plate_number.contains(plate, autoescape=True)
+    return condition
 
 
 def normalize_plate(value: str) -> str:
@@ -228,7 +269,7 @@ class ViolationService:
         )
 
     async def detail(
-        self, violation_id: int, permissions: frozenset[str], role: str
+        self, violation_id: int, permissions: frozenset[str], role: str, signer: MediaSigner
     ) -> ViolationDetail:
         row = (
             await self.session.execute(violation_rows_stmt().where(Violation.id == violation_id))
@@ -237,14 +278,12 @@ class ViolationService:
             raise NotFoundError("Violation")
         item = violation_item(row)
         violation: Violation = row[0]
-        location = row[3]
+        location: Location | None = row[3]
         district = row[4]
+        vehicle: Vehicle | None = row[6]
 
         reviewer = (
             await self.session.get(User, violation.reviewed_by) if violation.reviewed_by else None
-        )
-        vehicle = (
-            await self.session.get(Vehicle, violation.vehicle_id) if violation.vehicle_id else None
         )
         actor = aliased(User)
         events = await self.session.execute(
@@ -253,24 +292,20 @@ class ViolationService:
             .where(ViolationEvent.violation_id == violation_id)
             .order_by(ViolationEvent.created_at, ViolationEvent.id)
         )
-        evidence = await self.session.scalars(
-            select(ViolationEvidence)
-            .where(ViolationEvidence.violation_id == violation_id)
-            .order_by(ViolationEvidence.id)
-        )
         return ViolationDetail(
-            **item.model_dump(),
+            **item.model_dump(exclude={"vehicle"}),
             excess_speed=violation.excess_speed,
-            direction=violation.direction,
             traffic_light_state=violation.traffic_light_state,
             track_id=violation.track_id,
             reviewed_by=user_ref(reviewer),
             reviewed_at=violation.reviewed_at,
             rejection_reason=violation.rejection_reason,
             created_at=violation.created_at,
+            duplicate_count=violation.duplicate_count,
             location=location_ref(location, district),
+            address=location.address if location else None,
             vehicle=VehicleBrief.model_validate(vehicle) if vehicle else None,
-            evidence=[EvidenceOut.model_validate(e) for e in evidence],
+            evidence=await self.evidence(violation_id, signer, check_exists=False),
             events=[
                 ViolationEventOut(
                     id=event.id,
@@ -286,6 +321,18 @@ class ViolationService:
             allowed_actions=allowed_actions(violation.status, permissions, role),
             meta=violation.meta,
         )
+
+    async def evidence(
+        self, violation_id: int, signer: MediaSigner, *, check_exists: bool = True
+    ) -> list[EvidenceOut]:
+        if check_exists and not await self.session.scalar(
+            select(Violation.id).where(Violation.id == violation_id)
+        ):
+            raise NotFoundError("Violation")
+        rows = await self.session.scalars(
+            select(ViolationEvidence).where(ViolationEvidence.violation_id == violation_id)
+        )
+        return sort_evidence([evidence_out(e, signer) for e in rows])
 
     async def transition(
         self,
